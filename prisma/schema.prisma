@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String    // Hashed password
+  role      String    @default("STAFF") // "ADMIN" or "STAFF"
+  isBanned  Boolean   @default(false)
+  photo     String?   // URL or Base64 for profile picture
+  birthdate DateTime? 
+  tasks     Task[]    @relation("TaskAssignee")
+  contents  Content[] @relation("ContentAuthor")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("ACTIVE") // "ACTIVE", "COMPLETED", "ARCHIVED"
+  tasks       Task[]
+  reports     Report[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  content     String?   // For Notion-like rich text blocks or markdown
+  status      String    @default("TODO") // "TODO", "IN_PROGRESS", "REVIEW", "DONE"
+  dueDate     DateTime?
+  
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  assigneeId  String?
+  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  contentId   String?
+  linkedContent Content?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  title       String
+  metrics     String   // Storing JSON string of metrics (e.g. reach, impressions, engagement)
+  date        DateTime @default(now())
+  
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Content {
+  id            String    @id @default(cuid())
+  title         String
+  caption       String?
+  mediaUrl      String?
+  customFields  String?   // JSON string storing custom properties { "propId": "value" }
+  
+  tasks         Task[]
+  
+  authorId      String?
+  author        User?     @relation("ContentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model PropertyDefinition {
+  id          String   @id @default(cuid())
+  name        String   // Display Name e.g. "Status", "Priority"
+  type        String   // "TEXT", "NUMBER", "SELECT", "MULTI_SELECT", "DATE", "PERSON", "CHECKBOX"
+  options     String?  // JSON string array of options for SELECT/MULTI_SELECT types
+  order       Int      @default(0) // Used for drag-and-drop reordering
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
