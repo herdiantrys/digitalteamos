@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { requireAuth } from './auth';
+import { recordContentHistory } from './history-actions';
 
 const prisma = new PrismaClient();
 
@@ -16,14 +17,11 @@ export async function getContentById(id: string) {
             caption: true,
             mediaUrl: true,
             customFields: true,
+            orderIdx: true,
             authorId: true,
             createdAt: true,
             updatedAt: true,
             author: true,
-            tasks: {
-                include: { assignee: { select: { name: true } } },
-                orderBy: { createdAt: 'desc' }
-            }
         }
     });
 }
@@ -32,6 +30,7 @@ export async function createContent(formData: FormData) {
     const user = await requireAuth();
 
     const title = formData.get('title') as string;
+    const caption = (formData.get('caption') as string) || null;
 
     // Extract all dynamic properties (anything prefixed with 'prop_')
     const customFields: Record<string, any> = {};
@@ -53,6 +52,7 @@ export async function createContent(formData: FormData) {
     await prisma.content.create({
         data: {
             title,
+            caption,
             customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
             authorId: user.id
         }
@@ -74,16 +74,26 @@ export async function updateContentField(contentId: string, customFieldsJson: st
 
 
 export async function updateSingleContentField(contentId: string, propId: string, value: any) {
-    await requireAuth();
+    const user = await requireAuth();
 
     const content = await prisma.content.findUnique({
         where: { id: contentId },
-        select: { customFields: true }
+        select: { title: true, caption: true, customFields: true }
     });
     if (!content) return;
 
-    const currentFields = content.customFields ? JSON.parse(content.customFields) : {};
+    // Save history snapshot BEFORE the change
+    const oldFields = content.customFields ? JSON.parse(content.customFields) : {};
+    const oldVal = oldFields[propId] ?? '(empty)';
+    const newVal = value || '(empty)';
+    await recordContentHistory(
+        contentId,
+        content,
+        `Changed field: ${propId.slice(0, 8)}… · "${oldVal}" → "${newVal}"`,
+        user.name ?? user.email
+    );
 
+    const currentFields = { ...oldFields };
     if (value === null || value === '') {
         delete currentFields[propId];
     } else {
@@ -99,7 +109,17 @@ export async function updateSingleContentField(contentId: string, propId: string
 }
 
 export async function deleteContent({ id }: { id: string }) {
-    await requireAuth();
+    const user = await requireAuth();
+
+    if (user.role !== 'ADMIN') {
+        const content = await prisma.content.findUnique({
+            where: { id },
+            select: { authorId: true }
+        });
+        if (content && content.authorId !== user.id) {
+            throw new Error('Unauthorized: You can only delete your own content.');
+        }
+    }
 
     await prisma.content.delete({
         where: { id }
@@ -110,15 +130,40 @@ export async function deleteContent({ id }: { id: string }) {
 
 // ── Bulk actions ──────────────────────────────────────────────────────────────
 export async function bulkDeleteContent(ids: string[]) {
-    await requireAuth();
+    const user = await requireAuth();
     if (!ids.length) return;
 
-    await prisma.content.deleteMany({ where: { id: { in: ids } } });
+    if (user.role === 'ADMIN') {
+        await prisma.content.deleteMany({ where: { id: { in: ids } } });
+    } else {
+        // Staff can only delete their own
+        await prisma.content.deleteMany({
+            where: {
+                id: { in: ids },
+                authorId: user.id
+            }
+        });
+    }
     revalidatePath('/content');
 }
 
 export async function updateContentMain(id: string, data: { title?: string; caption?: string }) {
-    await requireAuth();
+    const user = await requireAuth();
+
+    // Snapshot before change
+    const current = await prisma.content.findUnique({
+        where: { id },
+        select: { title: true, caption: true, customFields: true }
+    });
+    if (current) {
+        const parts: string[] = [];
+        if (data.title && data.title !== current.title) parts.push(`Title: "${current.title}" → "${data.title}"`);
+        if (data.caption !== undefined && data.caption !== current.caption) parts.push('Caption updated');
+        if (parts.length > 0) {
+            await recordContentHistory(id, current, parts.join(', '), user.name ?? user.email);
+        }
+    }
+
     const updated = await prisma.content.update({
         where: { id },
         data: {
@@ -131,3 +176,70 @@ export async function updateContentMain(id: string, data: { title?: string; capt
     return updated;
 }
 
+
+export async function updateMultipleContentOrder(updates: { id: string, orderIdx: number }[]) {
+    await requireAuth();
+
+    await prisma.$transaction(
+        updates.map(u => prisma.content.update({
+            where: { id: u.id },
+            // @ts-ignore - Field added to DB but client generation locked by running server
+            data: { orderIdx: u.orderIdx }
+        }))
+    );
+
+    revalidatePath('/content');
+}
+
+export async function bulkUpdateContentProperty(ids: string[], propId: string, value: any) {
+    const user = await requireAuth();
+    if (!ids.length) return;
+
+    // Snapshot current state for all items to record history
+    const items = await prisma.content.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, title: true, caption: true, customFields: true, authorId: true }
+    });
+
+    const results = [];
+    for (const item of items) {
+        // Staff check (optional: only allow updating own content if not ADMIN)
+        // However, usually bulk edit is for items you have permission for.
+        // Let's enforce that Staff can only update their own content.
+        if (user.role !== 'ADMIN' && item.authorId !== user.id) {
+            continue; // Skip items they don't own
+        }
+
+        const currentFields = item.customFields ? JSON.parse(item.customFields) : {};
+        const oldVal = currentFields[propId] ?? '(empty)';
+        const newVal = value || '(empty)';
+
+        // Record history
+        await recordContentHistory(
+            item.id,
+            item,
+            `Bulk Edit field ${propId.slice(0, 8)}: "${oldVal}" → "${newVal}"`,
+            user.name ?? user.email
+        );
+
+        const updatedFields = { ...currentFields };
+        if (value === null || value === '') {
+            delete updatedFields[propId];
+        } else {
+            updatedFields[propId] = value;
+        }
+
+        results.push(
+            prisma.content.update({
+                where: { id: item.id },
+                data: { customFields: JSON.stringify(updatedFields) }
+            })
+        );
+    }
+
+    if (results.length > 0) {
+        await prisma.$transaction(results);
+    }
+
+    revalidatePath('/content');
+}

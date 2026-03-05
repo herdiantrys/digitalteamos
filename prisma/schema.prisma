@@ -15,8 +15,8 @@ model User {
   role      String    @default("STAFF") // "ADMIN" or "STAFF"
   isBanned  Boolean   @default(false)
   photo     String?   // URL or Base64 for profile picture
+  bio       String?   // Short biography
   birthdate DateTime? 
-  tasks     Task[]    @relation("TaskAssignee")
   contents  Content[] @relation("ContentAuthor")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -27,30 +27,9 @@ model Project {
   name        String
   description String?
   status      String   @default("ACTIVE") // "ACTIVE", "COMPLETED", "ARCHIVED"
-  tasks       Task[]
   reports     Report[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-model Task {
-  id          String    @id @default(cuid())
-  title       String
-  content     String?   // For Notion-like rich text blocks or markdown
-  status      String    @default("TODO") // "TODO", "IN_PROGRESS", "REVIEW", "DONE"
-  dueDate     DateTime?
-  
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  assigneeId  String?
-  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  
-  contentId   String?
-  linkedContent Content?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 }
 
 model Report {
@@ -72,8 +51,9 @@ model Content {
   caption       String?
   mediaUrl      String?
   customFields  String?   // JSON string storing custom properties { "propId": "value" }
+  orderIdx      Int       @default(0) // Used to sort items within the same calendar date
   
-  tasks         Task[]
+  history       ContentHistory[]
   
   authorId      String?
   author        User?     @relation("ContentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
@@ -87,7 +67,32 @@ model PropertyDefinition {
   name        String   // Display Name e.g. "Status", "Priority"
   type        String   // "TEXT", "NUMBER", "SELECT", "MULTI_SELECT", "DATE", "PERSON", "CHECKBOX"
   options     String?  // JSON string array of options for SELECT/MULTI_SELECT types
+  colorConfig String?  // JSON mapping of option values to color names
   order       Int      @default(0) // Used for drag-and-drop reordering
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ContentHistory {
+  id          String   @id @default(cuid())
+  contentId   String
+  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  snapshot    String   // Full JSON snapshot: { title, caption, customFields }
+  changedBy   String?  // User name at time of change
+  changeDesc  String?  // Human-readable description e.g. "Updated Status → Published"
+  createdAt   DateTime @default(now())
+}
+
+model ContentView {
+  id                 String   @id @default(cuid())
+  name               String
+  layout             String   // e.g. "table", "board", "gallery", "list", "timeline", "calendar"
+  propertyVisibility String?  // JSON array of property IDs to show
+  filter             String?  // JSON representing active filters
+  sort               String?  // JSON representing sorting rules
+  groupBy            String?  // Property ID to group by
+  layoutConfig       String?  // JSON for view-specific settings like 'zoom' for timeline
+  order              Int      @default(0) // Order of the view tab
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }

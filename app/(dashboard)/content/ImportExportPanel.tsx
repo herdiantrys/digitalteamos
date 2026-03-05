@@ -13,6 +13,7 @@ import {
     type AnalyzedRow,
     type ConflictResolution,
 } from '../../../lib/import-export-actions';
+import { X, ArrowUpDown, Download, Upload, FileSpreadsheet, FileText, UploadCloud, AlertTriangle, Check, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 type Tab = 'export' | 'import';
@@ -26,10 +27,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
     document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
-const TYPE_ICONS: Record<string, string> = {
-    TEXT: 'T', NUMBER: '#', SELECT: '▾', MULTI_SELECT: '◫',
-    DATE: '📅', PERSON: '👤', CHECKBOX: '☑', URL: '🔗',
-};
+
 
 const RESOLUTION_COLORS: Record<ConflictResolution, { bg: string; color: string }> = {
     replace: { bg: 'rgba(250,173,20,0.12)', color: '#faad14' },
@@ -38,8 +36,10 @@ const RESOLUTION_COLORS: Record<ConflictResolution, { bg: string; color: string 
 };
 
 // ── Trigger button ───────────────────────────────────────────────────────────
-export default function ImportExportPanel() {
+export default function ImportExportPanel({ userRole }: { userRole?: string }) {
     const [isOpen, setIsOpen] = useState(false);
+
+    if (userRole !== 'ADMIN') return null;
 
     if (!isOpen) return (
         <button onClick={() => setIsOpen(true)} style={{
@@ -51,7 +51,7 @@ export default function ImportExportPanel() {
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-color)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--sidebar-bg)')}
         >
-            <span style={{ fontSize: 15 }}>⇅</span> Import / Export
+            <span style={{ display: 'flex' }}><ArrowUpDown size={14} strokeWidth={2.5} /></span> Import / Export
         </button>
     );
 
@@ -85,7 +85,7 @@ function PanelContent({ onClose }: { onClose: () => void }) {
                     <div style={{ fontWeight: 700, fontSize: 15 }}>Import / Export</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Transfer content data via CSV or Markdown</div>
                 </div>
-                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 14 }}>✕</button>
+                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
             </div>
 
             {/* Tabs */}
@@ -96,8 +96,8 @@ function PanelContent({ onClose }: { onClose: () => void }) {
                         background: 'transparent', border: 'none', cursor: 'pointer',
                         color: tab === t ? 'var(--text-primary)' : 'var(--text-secondary)',
                         borderBottom: tab === t ? '2px solid var(--text-primary)' : '2px solid transparent',
-                        transition: 'color 0.2s'
-                    }}>{t === 'export' ? '↓ Export' : '↑ Import'}</button>
+                        transition: 'color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                    }}>{t === 'export' ? <><Download size={14} /> Export</> : <><Upload size={14} /> Import</>}</button>
                 ))}
             </div>
 
@@ -126,17 +126,17 @@ function ExportTab() {
             onMouseEnter={e => !loading && ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.3)')}
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-color)')}
         >
-            <span style={{ fontSize: 28 }}>{icon}</span>
+            <span style={{ display: 'flex', color: 'var(--text-secondary)' }}>{icon}</span>
             <div><div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{desc}</div></div>
-            <span style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }}>↓</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--text-secondary)', display: 'flex' }}><Download size={14} /></span>
         </div>
     );
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Download all content and custom property data.</p>
-            <ExportCard icon="📊" title="Export as CSV" desc="Spreadsheet-compatible. All columns including custom properties." onClick={handleCSV} />
-            <ExportCard icon="📝" title="Export as Markdown" desc="Each content item as a document with YAML frontmatter." onClick={handleMD} />
+            <ExportCard icon={<FileSpreadsheet size={28} strokeWidth={1.5} />} title="Export as CSV" desc="Spreadsheet-compatible. All columns including custom properties." onClick={handleCSV} />
+            <ExportCard icon={<FileText size={28} strokeWidth={1.5} />} title="Export as Markdown" desc="Each content item as a document with YAML frontmatter." onClick={handleMD} />
             {loading && <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>Generating…</div>}
         </div>
     );
@@ -221,7 +221,7 @@ function ImportWizard() {
                 }}
             >
                 <input type="file" accept=".csv,.md,.markdown" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-                <span style={{ fontSize: 36 }}>{loading ? '⏳' : '📂'}</span>
+                <span style={{ display: 'flex', color: 'var(--text-secondary)' }}><UploadCloud size={36} strokeWidth={1.5} /></span>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{loading ? 'Analyzing file…' : 'Drop file here or click to browse'}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Accepted: .csv · .md · .markdown</span>
             </label>
@@ -259,14 +259,14 @@ function ImportWizard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* File summary */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12, background: 'var(--sidebar-bg)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: 20 }}>{isMarkdown ? '📝' : '📊'}</span>
+                    <span style={{ display: 'flex', color: 'var(--text-secondary)' }}>{isMarkdown ? <FileText size={20} strokeWidth={1.5} /> : <FileSpreadsheet size={20} strokeWidth={1.5} />}</span>
                     <div>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{fileName}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                             {analysis ? `${analysis.totalRows} rows` : 'Markdown'} ·{' '}
                             {conflictCount > 0
-                                ? <span style={{ color: '#faad14' }}>⚠ {conflictCount} conflict{conflictCount > 1 ? 's' : ''}</span>
-                                : <span style={{ color: '#27ae60' }}>✓ No conflicts</span>
+                                ? <span style={{ color: '#faad14', display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={12} strokeWidth={3} /> {conflictCount} conflict{conflictCount > 1 ? 's' : ''}</span>
+                                : <span style={{ color: '#27ae60', display: 'flex', alignItems: 'center', gap: 4 }}><Check size={12} strokeWidth={3} /> No conflicts</span>
                             }
                             {analysis?.newPropCount ? ` · ${analysis.newPropCount} new properties` : ''}
                         </div>
@@ -382,7 +382,6 @@ function ImportWizard() {
                                         <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'rgba(250,173,20,0.15)', color: '#faad14', fontWeight: 600, flexShrink: 0 }}>EXISTS</span>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontWeight: 500, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.title}>{row.title}</div>
-                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{row.platform} · {row.status}</div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                             {(['skip', 'replace', 'add'] as ConflictResolution[]).map(r => (
@@ -407,12 +406,12 @@ function ImportWizard() {
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-                    <button onClick={reset} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>← Back</button>
+                    <button onClick={reset} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={14} /> Back</button>
                     <button onClick={handleExecute} disabled={loading} style={{
                         padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                         border: 'none', background: loading ? 'rgba(255,255,255,0.1)' : 'var(--text-primary)',
                         color: 'var(--bg-color)', cursor: loading ? 'not-allowed' : 'pointer'
-                    }}>{loading ? 'Importing…' : `Import ${analysis ? analysis.totalRows : ''} rows →`}</button>
+                    }}>{loading ? 'Importing…' : `Import ${analysis ? analysis.totalRows : ''} rows`}</button>
                 </div>
             </div>
         );
@@ -428,7 +427,9 @@ function ImportWizard() {
                     background: hasErrors ? 'rgba(255,77,79,0.06)' : 'rgba(39,174,96,0.06)',
                     border: `1px solid ${hasErrors ? 'rgba(255,77,79,0.3)' : 'rgba(39,174,96,0.3)'}`
                 }}>
-                    <div style={{ fontSize: 40, marginBottom: 10 }}>{hasErrors ? '⚠️' : '✅'}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10, color: hasErrors ? '#ff4d4f' : '#27ae60' }}>
+                        {hasErrors ? <AlertTriangle size={40} /> : <CheckCircle2 size={40} />}
+                    </div>
                     <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>{hasErrors ? 'Import completed with issues' : 'Import successful!'}</div>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
                         <div style={{ textAlign: 'center' }}><div style={{ fontSize: 24, fontWeight: 700, color: '#27ae60' }}>{result.imported}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Added</div></div>

@@ -11,7 +11,6 @@ export default async function DashboardLayout({
 
     return (
         <div className="app-container">
-            {/* @ts-expect-error Sidebar accepts userRole, type mismatch due to Next.js cache */}
             <Sidebar userName={user?.name} userRole={user?.role} />
             <main className="main-content">
                 <Topbar userName={user?.name || 'User'} />

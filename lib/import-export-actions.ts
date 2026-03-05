@@ -10,7 +10,8 @@ const prisma = new PrismaClient();
 // EXPORT: Generate CSV string from all content + properties
 // ──────────────────────────────────────────────────────────────────────────────
 export async function exportContentCSV(): Promise<string> {
-    await requireAuth();
+    const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can export data.');
 
     const contents = await prisma.content.findMany({
         include: { author: true },
@@ -47,7 +48,8 @@ export async function exportContentCSV(): Promise<string> {
 // EXPORT: Generate Markdown string from all content
 // ──────────────────────────────────────────────────────────────────────────────
 export async function exportContentMarkdown(): Promise<string> {
-    await requireAuth();
+    const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can export data.');
 
     const contents = await prisma.content.findMany({
         include: { author: true },
@@ -206,6 +208,7 @@ async function ensurePropertiesExist(
 // ──────────────────────────────────────────────────────────────────────────────
 export async function importContentCSV(csvText: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can import data.');
 
     const existingProps = await prisma.propertyDefinition.findMany();
     const propByName = new Map<string, any>(existingProps.map((p: any) => [p.name.toLowerCase().trim(), p]));
@@ -289,8 +292,6 @@ export async function importContentCSV(csvText: string): Promise<{ imported: num
             await prisma.content.create({
                 data: {
                     title,
-                    platform,
-                    status,
                     caption: caption || null,
                     mediaUrl: mediaUrl || null,
                     customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
@@ -315,8 +316,6 @@ export async function importContentCSV(csvText: string): Promise<{ imported: num
 export interface AnalyzedRow {
     index: number;         // row index in file
     title: string;
-    platform: string;
-    status: string;
     conflict: boolean;     // true if a content with same title already exists
     existingId?: string;   // id of the existing content
 }
@@ -382,7 +381,8 @@ function parseCsvLines(csvText: string): { headers: string[]; rows: Record<strin
 }
 
 export async function analyzeImportCSV(csvText: string): Promise<AnalyzeResult> {
-    await requireAuth();
+    const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can perform import analysis.');
 
     const existingProps = await prisma.propertyDefinition.findMany({ orderBy: { name: 'asc' } });
     const propMap = new Map<string, any>();
@@ -426,8 +426,6 @@ export async function analyzeImportCSV(csvText: string): Promise<AnalyzeResult> 
         return {
             index: idx + 1,
             title: title || '(no title)',
-            platform: row['platform'] || row['channel'] || row['sosmed'] || 'General',
-            status: row['status'] || 'DRAFT',
             conflict: !!existingId,
             existingId,
         };
@@ -467,6 +465,7 @@ export interface ImportOptions {
 
 export async function executeImportCSV(opts: ImportOptions): Promise<{ imported: number; replaced: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can execute data import.');
 
     const existingProps = await prisma.propertyDefinition.findMany();
     const { headers, rows } = parseCsvLines(opts.csvText);
@@ -604,6 +603,7 @@ export async function executeImportCSV(opts: ImportOptions): Promise<{ imported:
 // ──────────────────────────────────────────────────────────────────────────────
 export async function importContentMarkdown(mdText: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
+    if (user.role !== 'ADMIN') throw new Error('Only admins can import data.');
 
     const properties = await prisma.propertyDefinition.findMany();
     // Build a flexible header → prop map (same strategy as CSV)
@@ -664,8 +664,6 @@ export async function importContentMarkdown(mdText: string): Promise<{ imported:
             await prisma.content.create({
                 data: {
                     title,
-                    platform,
-                    status,
                     caption: caption || null,
                     mediaUrl: mediaUrl || null,
                     customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,

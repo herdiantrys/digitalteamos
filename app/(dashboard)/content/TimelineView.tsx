@@ -2,426 +2,674 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronRight, Calendar, GripVertical } from 'lucide-react';
+import { getBadgeColorObj } from '../../../lib/colors';
+import { updateSingleContentField } from '../../../lib/content-actions';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Constants & Helpers
+// Helpers
 // ──────────────────────────────────────────────────────────────────────────────
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FULL_MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-type ZoomLevel = 'day' | 'week' | 'month';
-type GroupBy = 'platform' | 'none';
+type ZoomLevel = 'hours' | 'day' | 'week' | 'bi-week' | 'month' | 'year';
 
-const COL_WIDTH: Record<ZoomLevel, number> = { day: 40, week: 28, month: 22 };
+const ZOOM_CONFIG: Record<ZoomLevel, { colW: number; totalDays: number }> = {
+    hours: { colW: 480, totalDays: 14 },
+    day: { colW: 48, totalDays: 45 },
+    week: { colW: 32, totalDays: 90 },
+    'bi-week': { colW: 24, totalDays: 120 },
+    month: { colW: 8, totalDays: 365 },
+    year: { colW: 2.5, totalDays: 1095 }
+};
 
-function daysBetween(a: Date, b: Date) {
-    return Math.round((b.getTime() - a.getTime()) / 86_400_000);
-}
-
-function addDays(d: Date, n: number) {
-    const res = new Date(d);
-    res.setDate(res.getDate() + n);
-    return res;
-}
-
-function startOfWeek(d: Date) {
-    const r = new Date(d);
-    r.setDate(r.getDate() - r.getDay());
-    return r;
-}
-
+function daysBetween(a: Date, b: Date) { return Math.round((b.getTime() - a.getTime()) / 86_400_000); }
+function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function isSameDay(a: Date, b: Date) {
-    return a.getFullYear() === b.getFullYear() &&
-        a.getMonth() === b.getMonth() &&
-        a.getDate() === b.getDate();
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Timeline Header (month labels + day ticks)
+// Timeline Header
 // ──────────────────────────────────────────────────────────────────────────────
-function TimelineHeader({ startDate, totalDays, zoom, colW, todayOffset }: {
-    startDate: Date; totalDays: number; zoom: ZoomLevel; colW: number; todayOffset: number;
+function TimelineHeader({ topRowItems, bottomRowItems, zoom, leftPanelWidth }: {
+    topRowItems: { label: string; left: number; width: number }[];
+    bottomRowItems: { label: string; left: number; width: number; isToday?: boolean; isWeekend?: boolean }[];
+    zoom: ZoomLevel; leftPanelWidth: number;
 }) {
-    // Build month spans
-    const monthSpans: { label: string; startIdx: number; span: number }[] = [];
-    let cur = new Date(startDate);
-    for (let i = 0; i < totalDays;) {
-        const month = cur.getMonth();
-        const year = cur.getFullYear();
-        let count = 0;
-        while (i + count < totalDays && new Date(startDate).setDate(startDate.getDate() + i + count), new Date(startDate.getTime() + (i + count) * 86_400_000).getMonth() === month) {
-            count++;
-        }
-        monthSpans.push({ label: `${FULL_MONTH[month]} ${year}`, startIdx: i, span: count });
-        i += count;
-        cur = new Date(startDate.getTime() + i * 86_400_000);
-    }
-
     return (
-        <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)' }}>
-            {/* Month row */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
-                {monthSpans.map((ms, i) => (
-                    <div key={i} style={{
-                        width: ms.span * colW,
-                        flexShrink: 0,
-                        padding: '6px 8px',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: 'var(--text-secondary)',
-                        borderRight: '1px solid var(--border-color)',
-                        whiteSpace: 'nowrap', overflow: 'hidden'
-                    }}>
-                        {ms.label}
-                    </div>
-                ))}
-            </div>
-            {/* Day / Week ticks */}
-            <div style={{ display: 'flex', position: 'relative' }}>
-                {Array.from({ length: totalDays }, (_, i) => {
-                    const d = new Date(startDate.getTime() + i * 86_400_000);
-                    const isToday = isSameDay(d, new Date());
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-
-                    if (zoom === 'month' && d.getDate() !== 1 && d.getDate() % 7 !== 1) {
-                        return (
-                            <div key={i} style={{ width: colW, flexShrink: 0, borderRight: '1px solid transparent', background: isWeekend ? 'rgba(255,255,255,0.02)' : undefined }}>
-                                {isToday && <div style={{ width: 2, height: '100%', background: 'hsl(10, 90%, 60%)', position: 'absolute', left: i * colW + colW / 2 }} />}
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div key={i} style={{
-                            width: colW, flexShrink: 0,
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            padding: '4px 0',
-                            borderRight: '1px solid var(--border-color)',
-                            background: isToday
-                                ? 'hsl(10, 90%, 15%)'
-                                : isWeekend
-                                    ? 'rgba(255,255,255,0.015)'
-                                    : undefined,
-                            fontSize: 10,
-                            fontWeight: isToday ? 700 : 400,
-                            color: isToday ? 'hsl(10, 90%, 70%)' : isWeekend ? 'var(--text-secondary)' : 'var(--text-primary)'
-                        }}>
-                            {zoom !== 'month' && <span style={{ opacity: 0.5 }}>{DAY_LABELS[d.getDay()]}</span>}
-                            <span>{d.getDate()}</span>
-                        </div>
-                    );
-                })}
-                {/* Today red line */}
-                {todayOffset >= 0 && todayOffset < totalDays && (
-                    <div style={{
-                        position: 'absolute', top: 0, bottom: 0,
-                        left: todayOffset * colW + colW / 2 - 1,
-                        width: 2, background: 'hsl(10, 90%, 60%)',
-                        pointerEvents: 'none'
-                    }} />
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Timeline Bar (a single content item as a horizontal pill)
-// ──────────────────────────────────────────────────────────────────────────────
-function TimelineBar({ content, startDate, totalDays, colW, datePropId, properties }: {
-    content: any; startDate: Date; totalDays: number; colW: number; datePropId: string | null; properties: any[];
-}) {
-    const getDate = (c: any): Date | null => {
-        if (!datePropId) return null;
-        try {
-            const fields = JSON.parse(c.customFields || '{}');
-            const v = fields[datePropId];
-            if (!v) return null;
-            const d = new Date(v);
-            return isNaN(d.getTime()) ? null : d;
-        } catch { return null; }
-    };
-
-    const date = getDate(content);
-    if (!date) return null;
-
-    const offset = daysBetween(startDate, date);
-    if (offset < 0 || offset >= totalDays) return null;
-
-    const color = 'hsl(210, 60%, 60%)';
-    const left = offset * colW;
-    const router = useRouter();
-
-    return (
-        <div
-            title={`${content.title}\n${date.toLocaleDateString()}\nClick to open detail`}
-            onClick={() => router.push(`/content/${content.id}`)}
-            style={{
-                position: 'absolute',
-                left: left + 2,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                height: 26,
-                minWidth: colW * 2,
-                maxWidth: (totalDays - offset) * colW - 4,
-                background: color,
-                borderRadius: 6,
-                display: 'flex', alignItems: 'center',
-                padding: '0 10px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                fontSize: 12, fontWeight: 600,
-                color: '#fff',
-                boxShadow: `0 2px 8px ${color}55`,
-                cursor: 'pointer',
-                userSelect: 'none',
-                zIndex: 2,
-                transition: 'filter 0.15s, transform 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.filter = 'brightness(1.15)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-50%) scaleY(1.08)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.filter = ''; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-50%)'; }}
-        >
-            {content.title}
-        </div>
-    );
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Timeline Row (a group section)
-// ──────────────────────────────────────────────────────────────────────────────
-function TimelineGroup({ label, contents, startDate, totalDays, colW, datePropId, color, todayOffset, properties }: {
-    label: string; contents: any[]; startDate: Date; totalDays: number; colW: number;
-    datePropId: string | null; color: string; todayOffset: number; properties: any[];
-}) {
-    const [collapsed, setCollapsed] = useState(false);
-
-    return (
-        <div style={{ borderBottom: '1px solid var(--border-color)' }}>
-            {/* Group header */}
-            <div
-                onClick={() => setCollapsed(c => !c)}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 12px',
-                    cursor: 'pointer',
-                    background: 'var(--sidebar-bg)',
-                    borderBottom: '1px solid var(--border-color)',
-                    position: 'sticky', left: 0, zIndex: 5,
-                    width: '100%', boxSizing: 'border-box'
-                }}
-            >
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)', transition: 'transform 0.2s', display: 'inline-block', transform: collapsed ? 'rotate(-90deg)' : 'rotate(0)' }}>▾</span>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{label}</span>
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 4 }}>({contents.length})</span>
-            </div>
-
-            {!collapsed && contents.map(c => (
-                <div key={c.id} style={{ position: 'relative', height: 44, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    {/* Row background — weekend shading + today line */}
-                    {Array.from({ length: totalDays }, (_, i) => {
-                        const d = new Date(startDate.getTime() + i * 86_400_000);
-                        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                        if (!isWeekend && i !== todayOffset) return null;
-                        return (
-                            <div key={i} style={{
-                                position: 'absolute', top: 0, bottom: 0,
-                                left: i * colW, width: colW,
-                                background: i === todayOffset ? 'hsl(10, 90%, 10%, 0.3)' : 'rgba(255,255,255,0.018)',
-                                pointerEvents: 'none'
-                            }} />
-                        );
-                    })}
-                    {/* Today line */}
-                    {todayOffset >= 0 && todayOffset < totalDays && (
-                        <div style={{ position: 'absolute', top: 0, bottom: 0, left: todayOffset * colW + colW / 2 - 1, width: 2, background: 'hsl(10, 90%, 60%)', opacity: 0.4, pointerEvents: 'none', zIndex: 1 }} />
-                    )}
-                    <TimelineBar content={c} startDate={startDate} totalDays={totalDays} colW={colW} datePropId={datePropId} properties={properties} />
+        <div style={{ display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 30, background: 'var(--bg-color)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--border-color)' }}>
+            {/* Top row */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', height: 36, background: 'var(--glass-bg)', backdropFilter: 'blur(12px)' }}>
+                <div style={{ width: leftPanelWidth, flexShrink: 0, borderRight: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', paddingLeft: 16, position: 'sticky', left: 0, background: 'var(--bg-color)', zIndex: 31 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Project Items</span>
                 </div>
-            ))}
+                <div style={{ display: 'flex', position: 'relative', overflow: 'hidden', flex: 1 }}>
+                    {topRowItems.map((m, idx) => (
+                        <div key={idx} style={{
+                            position: 'absolute', left: m.left, width: m.width, height: '100%',
+                            display: 'flex', alignItems: 'center', padding: '0 8px', borderRight: '1px solid var(--border-color)'
+                        }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{m.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Bottom row */}
+            <div style={{ display: 'flex', borderBottom: '2px solid var(--border-color)', height: 28, background: 'var(--sidebar-bg)' }}>
+                <div style={{ width: leftPanelWidth, flexShrink: 0, borderRight: '1px solid var(--border-color)', position: 'sticky', left: 0, background: 'var(--sidebar-bg)', zIndex: 31 }} />
+                <div style={{ display: 'flex', position: 'relative', overflow: 'hidden', flex: 1 }}>
+                    {bottomRowItems.map((b, idx) => (
+                        <div key={idx} style={{
+                            position: 'absolute', left: b.left, width: b.width, height: '100%',
+                            borderRight: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            {b.isToday && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,122,255,0.08)' }} />}
+                            <span style={{
+                                fontSize: zoom === 'hours' || zoom === 'day' ? 11 : 9,
+                                fontWeight: b.isToday ? 700 : 400,
+                                color: b.isToday ? '#007aff' : b.isWeekend ? 'var(--text-secondary)' : 'var(--text-secondary)'
+                            }}>
+                                {b.label}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Main TimelineView Component
+// Main
 // ──────────────────────────────────────────────────────────────────────────────
-export default function TimelineView({ contents, properties }: {
+
+export default function TimelineView({
+    contents,
+    properties,
+    userOptionsRaw,
+    onOpenContent,
+    colorConfigMap,
+    viewSettings,
+    currentUser,
+}: {
     contents: any[];
     properties: any[];
     userOptionsRaw: string;
+    onOpenContent?: (id: string) => void;
+    colorConfigMap?: Record<string, string | null>;
+    viewSettings?: any;
+    currentUser?: any;
 }) {
-    const today = useMemo(() => new Date(), []);
-    const [zoom, setZoom] = useState<ZoomLevel>('week');
-    const [groupBy, setGroupBy] = useState<GroupBy>('platform');
-    const [datePropId, setDatePropId] = useState<string | null>(() => {
-        const dp = properties.find(p => p.type === 'DATE');
-        return dp?.id ?? null;
-    });
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
+    // ── Persistent View Settings Data ──
+    const layoutConfig = viewSettings?.layoutConfig ? JSON.parse(viewSettings.layoutConfig) : {};
+    const defaultZoom = (layoutConfig.zoom as ZoomLevel) || 'week';
+    const dateProps = useMemo(() => properties.filter(p => p.type === 'DATE'), [properties]);
 
-    // Build date range: 3 months back → 3 months forward
-    const rangeStart = useMemo(() => {
-        const d = new Date(today);
-        d.setMonth(d.getMonth() - 2);
-        d.setDate(1);
-        return d;
-    }, [today]);
+    const [zoom, setZoom] = useState<ZoomLevel>(defaultZoom);
 
-    const rangeEnd = useMemo(() => {
-        const d = new Date(today);
-        d.setMonth(d.getMonth() + 4);
-        d.setDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate());
-        return d;
-    }, [today]);
+    // Grouping and Date property from viewSettings
+    const groupPropId = viewSettings?.groupBy || null;
+    const datePropId = layoutConfig.datePropId || dateProps[0]?.id || null;
 
-    const totalDays = daysBetween(rangeStart, rangeEnd) + 1;
-    const colW = COL_WIDTH[zoom];
-    const todayOffset = daysBetween(rangeStart, today);
-
-    // Scroll to today on mount / zoom change
+    // Zoom sync
     useEffect(() => {
-        if (scrollRef.current) {
-            const targetScroll = Math.max(0, todayOffset * colW - 300);
-            scrollRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
-        }
-    }, [zoom, todayOffset, colW]);
+        if (layoutConfig.zoom) setZoom(layoutConfig.zoom);
+    }, [viewSettings?.layoutConfig]);
 
-    // Group contents
-    const groups = useMemo((): { label: string; items: any[]; color: string }[] => {
-        if (groupBy === 'none') return [{ label: 'All Content', items: contents, color: 'hsl(210, 70%, 60%)' }];
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    const [localContents, setLocalContents] = useState(contents);
 
-        const platformProp = properties.find(p => p.name.toLowerCase().includes('platform'));
+    const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+    const [dragOverDayOffset, setDragOverDayOffset] = useState<number | null>(null);
 
-        const map = new Map<string, any[]>();
-        for (const c of contents) {
-            const cd = JSON.parse(c.customFields || '{}');
-            let key = 'Unset';
-            if (groupBy === 'platform' && platformProp) {
-                key = cd[platformProp.id] || 'Unset';
+    const [resizingItemId, setResizingItemId] = useState<string | null>(null);
+    const [resizingSide, setResizingSide] = useState<'left' | 'right' | null>(null);
+
+    const [startDateStr, setStartDateStr] = useState(() => {
+        const d = new Date(); d.setDate(d.getDate() - 15);
+        return d.toISOString().slice(0, 10);
+    });
+    const gridRef = useRef<HTMLDivElement>(null);
+
+    const conf = ZOOM_CONFIG[zoom];
+    const colW = conf.colW;
+    const totalDays = conf.totalDays;
+    const startDate = useMemo(() => new Date(startDateStr), [startDateStr]);
+
+    const { topRowItems, bottomRowItems } = useMemo(() => {
+        const top: { label: string; left: number; width: number }[] = [];
+        const bottom: { label: string; left: number; width: number; isToday?: boolean; isWeekend?: boolean }[] = [];
+
+        if (zoom === 'hours') {
+            for (let i = 0; i < totalDays; i++) {
+                const d = addDays(startDate, i);
+                top.push({ label: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }), left: i * colW, width: colW });
             }
-            if (!map.has(key)) map.set(key, []);
-            map.get(key)!.push(c);
+        } else if (zoom === 'month' || zoom === 'year') {
+            let i = 0;
+            while (i < totalDays) {
+                const year = addDays(startDate, i).getFullYear();
+                let count = 0;
+                while (i + count < totalDays && addDays(startDate, i + count).getFullYear() === year) count++;
+                top.push({ label: String(year), left: i * colW, width: count * colW });
+                i += count;
+            }
+        } else {
+            let i = 0;
+            while (i < totalDays) {
+                const d = addDays(startDate, i);
+                const month = d.getMonth(), year = d.getFullYear();
+                let count = 0;
+                while (i + count < totalDays && addDays(startDate, i + count).getMonth() === month) count++;
+                top.push({ label: `${FULL_MONTH[month]} ${year}`, left: i * colW, width: count * colW });
+                i += count;
+            }
         }
-        const palette = [
-            'hsl(210, 70%, 60%)', 'hsl(280, 65%, 60%)', 'hsl(145, 60%, 50%)',
-            'hsl(30, 90%, 58%)', 'hsl(340, 70%, 60%)', 'hsl(190, 65%, 55%)',
-        ];
 
-        return Array.from(map.entries()).map(([label, items], i) => ({
-            label: label || 'Unset',
-            items,
-            color: palette[i % palette.length]
-        })).sort((a, b) => a.label.localeCompare(b.label));
-    }, [contents, groupBy, properties]);
+        if (zoom === 'hours') {
+            for (let i = 0; i < totalDays; i++) {
+                const d = addDays(startDate, i);
+                const isToday = isSameDay(d, new Date());
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                for (let h = 0; h < 24; h += 3) {
+                    bottom.push({
+                        label: `${String(h).padStart(2, '0')}:00`,
+                        left: i * colW + (h / 24) * colW,
+                        width: colW / 8,
+                        isToday,
+                        isWeekend
+                    });
+                }
+            }
+        } else if (zoom === 'year') {
+            let i = 0;
+            while (i < totalDays) {
+                const d = addDays(startDate, i);
+                const q = Math.floor(d.getMonth() / 3);
+                let count = 0;
+                while (i + count < totalDays && Math.floor(addDays(startDate, i + count).getMonth() / 3) === q) count++;
+                bottom.push({ label: `Q${q + 1}`, left: i * colW, width: count * colW });
+                i += count;
+            }
+        } else if (zoom === 'month') {
+            let i = 0;
+            while (i < totalDays) {
+                const d = addDays(startDate, i);
+                const month = d.getMonth();
+                let count = 0;
+                while (i + count < totalDays && addDays(startDate, i + count).getMonth() === month) count++;
+                bottom.push({ label: FULL_MONTH[month].substring(0, 3), left: i * colW, width: count * colW });
+                i += count;
+            }
+        } else {
+            for (let i = 0; i < totalDays; i++) {
+                const d = addDays(startDate, i);
+                const isToday = isSameDay(d, new Date());
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                let showLabel = false;
+                if (zoom === 'day') showLabel = true;
+                else if (zoom === 'week') showLabel = (d.getDay() === 1 || d.getDate() === 1);
+                else if (zoom === 'bi-week') showLabel = (d.getDay() === 1);
+                bottom.push({ label: showLabel ? String(d.getDate()) : '', left: i * colW, width: colW, isToday, isWeekend });
+            }
+        }
 
-    // Filter date properties
-    const dateProps = properties.filter(p => p.type === 'DATE');
+        return { topRowItems: top, bottomRowItems: bottom };
+    }, [startDate, zoom, colW, totalDays]);
 
-    const totalW = totalDays * colW;
+    const handleZoomChange = (newZoom: ZoomLevel) => {
+        const d = new Date(startDateStr);
+        const t = new Date();
+        const curOffset = daysBetween(d, t);
+        const newTotal = ZOOM_CONFIG[newZoom].totalDays;
+
+        if (curOffset < 0 || curOffset > newTotal * 0.8) {
+            const newStart = new Date(t);
+            newStart.setDate(t.getDate() - Math.floor(newTotal / 4));
+            setStartDateStr(newStart.toISOString().slice(0, 10));
+        }
+        setZoom(newZoom);
+    };
+
+
+    // Sync local contents when prop changes, but only if not resizing to avoid jank
+    useEffect(() => {
+        if (!resizingItemId) {
+            setLocalContents(contents);
+        }
+    }, [contents, resizingItemId]);
+
+    // Resolved Date Property
+    const usingFallbackDate = dateProps.length === 0;
+
+    // Grouping Options
+    const groupableProps = properties.filter(p => ['SELECT', 'STATUS', 'MULTI_SELECT', 'PERSON'].includes(p.type));
+
+    // Build grouped items
+    const grouped = useMemo(() => {
+        const groups: { key: string; label: string; color: { bg: string; text: string }; items: any[] }[] = [];
+
+        const filteredContents = localContents.filter(c => {
+            if (!datePropId) {
+                return usingFallbackDate && c.createdAt;
+            }
+            const cd = JSON.parse(c.customFields || '{}');
+            return !!cd[datePropId];
+        });
+
+        if (!groupPropId) {
+            groups.push({ key: '__all', label: 'All Content', color: { bg: '#e0e7ff', text: '#3730a3' }, items: filteredContents });
+        } else {
+            const prop = properties.find(p => p.id === groupPropId);
+            const isMulti = prop?.type === 'MULTI_SELECT' || prop?.type === 'PERSON';
+            const options: string[] = prop?.options ? JSON.parse(prop.options) : (prop?.type === 'PERSON' ? userOptionsRaw.split(',').map(s => s.trim()) : []);
+            const colorConfig: Record<string, string> = prop?.colorConfig ? JSON.parse(prop.colorConfig) : {};
+
+            const buckets: Record<string, any[]> = { Uncategorized: [] };
+            options.forEach(o => (buckets[o] = []));
+
+            filteredContents.forEach(c => {
+                const cd = c.customFields ? JSON.parse(c.customFields) : {};
+                const val = cd[groupPropId];
+
+                if (isMulti) {
+                    const itemsArr = Array.isArray(val) ? val : (typeof val === 'string' && val.trim() ? val.split(',').map(s => s.trim()) : []);
+                    const validItems = itemsArr.filter((v: string) => buckets[v]);
+                    if (validItems.length > 0) {
+                        validItems.forEach((v: string) => {
+                            buckets[v].push(c);
+                        });
+                    } else {
+                        buckets['Uncategorized'].push(c);
+                    }
+                } else {
+                    if (val && buckets[val]) buckets[val].push(c);
+                    else buckets['Uncategorized'].push(c);
+                }
+            });
+
+            [...options, 'Uncategorized'].forEach(opt => {
+                if (opt === 'Uncategorized' && buckets[opt].length === 0) return;
+                const colorObj = getBadgeColorObj(opt, colorConfig);
+                groups.push({ key: opt, label: opt, color: colorObj, items: buckets[opt] });
+            });
+        }
+        return groups;
+    }, [localContents, groupPropId, properties]);
+
+    // ── Resizing Logic ─────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!resizingItemId || !resizingSide || !datePropId) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!gridRef.current) return;
+            const rect = gridRef.current.getBoundingClientRect();
+            // gridRef.current has LEFT_PANEL width before the timeline entries start
+            const LEFT_PANEL = 260; // Hardcoded or from const
+            const x = e.clientX - rect.left - LEFT_PANEL + gridRef.current.scrollLeft;
+            const dayOffset = Math.floor(x / colW);
+
+            setLocalContents(prev => prev.map(c => {
+                if (c.id === resizingItemId) {
+                    const cd = JSON.parse(c.customFields || '{}');
+                    const val = cd[datePropId] || '';
+                    const [sPart, ePart] = val.includes(' → ') ? val.split(' → ') : [val, val];
+
+                    let newS = sPart;
+                    let newE = ePart || sPart;
+
+                    const targetDateStr = addDays(startDate, dayOffset).toISOString().slice(0, 10);
+
+                    if (resizingSide === 'left') {
+                        newS = targetDateStr;
+                        // Clamp: Start can't be after end
+                        if (newE && newS > newE) newS = newE;
+                    } else if (resizingSide === 'right') {
+                        newE = targetDateStr;
+                        // Clamp: End can't be before start
+                        if (newS && newE < newS) newE = newS;
+                    }
+
+                    const newVal = newS === newE ? newS : `${newS} → ${newE}`;
+                    return { ...c, customFields: JSON.stringify({ ...cd, [datePropId]: newVal }) };
+                }
+                return c;
+            }));
+        };
+
+        const handleMouseUp = async () => {
+            const item = localContents.find(c => c.id === resizingItemId);
+            if (item) {
+                const cd = JSON.parse(item.customFields || '{}');
+                const newVal = cd[datePropId];
+                try {
+                    await updateSingleContentField(resizingItemId, datePropId, newVal);
+                } catch (err) {
+                    console.error("Resize update failed", err);
+                    setLocalContents(contents);
+                }
+            }
+            setResizingItemId(null);
+            setResizingSide(null);
+            document.body.style.cursor = '';
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+        };
+    }, [resizingItemId, resizingSide, colW, startDate, datePropId, localContents, contents]);
+
+    const handleGridDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        if (!draggedItemId || dragOverDayOffset === null || !datePropId) return;
+
+        const contentId = draggedItemId;
+        const item = localContents.find(c => c.id === contentId);
+        if (!item) return;
+
+        const cd = JSON.parse(item.customFields || '{}');
+        const val = cd[datePropId] || '';
+        const [sPart, ePart] = val.includes(' → ') ? val.split(' → ') : [val, val];
+
+        const sDate = sPart ? new Date(sPart) : new Date();
+        const eDate = ePart ? new Date(ePart) : sDate;
+        const duration = daysBetween(sDate, eDate);
+
+        const newS = addDays(startDate, dragOverDayOffset);
+        const newE = addDays(newS, duration);
+
+        const newSStr = newS.toISOString().slice(0, 10);
+        const newEStr = newE.toISOString().slice(0, 10);
+        const newVal = newSStr === newEStr ? newSStr : `${newSStr} → ${newEStr}`;
+
+        // Optimistic update
+        setLocalContents(prev => prev.map(c => {
+            if (c.id === contentId) {
+                return { ...c, customFields: JSON.stringify({ ...JSON.parse(c.customFields || '{}'), [datePropId]: newVal }) };
+            }
+            return c;
+        }));
+
+        try {
+            await updateSingleContentField(contentId, datePropId, newVal);
+            setDraggedItemId(null);
+            setDragOverDayOffset(null);
+        } catch (error) {
+            console.error("Timeline drop failed:", error);
+            setLocalContents(contents);
+        }
+    };
+
+    const exactDaysFromStart = (new Date().getTime() - startDate.getTime()) / 86400000;
+
+    // Scroll to today on mount
+    const hasScrolledRef = useRef(false);
+    useEffect(() => {
+        if (gridRef.current && !hasScrolledRef.current && exactDaysFromStart > 0) {
+            gridRef.current.scrollLeft = exactDaysFromStart * colW - 200;
+            hasScrolledRef.current = true;
+        }
+    }, [exactDaysFromStart, colW]);
+
+    const navigate = (dir: -1 | 1) => {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + dir * Math.round(totalDays / 3));
+        setStartDateStr(d.toISOString().slice(0, 10));
+    };
+
+    const LEFT_PANEL = 260;
+    const HEADER_HEIGHT = 60;
+    const ROW_HEIGHT = 42;
+    const GROUP_HEIGHT = 36;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', minHeight: 400, overflow: 'hidden', border: '1px solid var(--border-color)', borderRadius: 12, background: 'var(--bg-color)', boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
-
-            {/* ── Toolbar ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-color)' }}>
+            {/* Toolbar */}
             <div style={{
-                display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px',
-                borderBottom: '1px solid var(--border-color)', background: 'var(--sidebar-bg)',
-                flexWrap: 'wrap', flexShrink: 0
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+                borderBottom: '1px solid var(--border-color)',
+                background: 'var(--sidebar-bg)',
+                flexWrap: 'wrap'
             }}>
-                {/* Date Property selector */}
-                {dateProps.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>Date Property:</span>
-                        <select
-                            value={datePropId || ''}
-                            onChange={e => setDatePropId(e.target.value || null)}
-                            style={{ padding: '5px 10px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-primary)', cursor: 'pointer', outline: 'none' }}
-                        >
-                            {dateProps.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
-                )}
-
-                {/* Group By */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>Group By:</span>
-                    <div style={{ display: 'flex', background: 'var(--bg-color)', padding: 2, borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                        {(['platform', 'none'] as GroupBy[]).map(g => (
-                            <button key={g} onClick={() => setGroupBy(g)} style={{
-                                padding: '4px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                                border: 'none',
-                                background: groupBy === g ? 'var(--text-primary)' : 'transparent',
-                                color: groupBy === g ? 'var(--bg-color)' : 'var(--text-secondary)',
-                                fontWeight: groupBy === g ? 600 : 500,
-                                transition: 'all 0.2s',
-                                textTransform: 'capitalize'
-                            }}>{g === 'none' ? 'Off' : g}</button>
-                        ))}
-                    </div>
+                {/* Zoom */}
+                <div style={{ display: 'flex', gap: 4, background: 'var(--bg-color)', borderRadius: 8, padding: 2, border: '1px solid var(--border-color)' }}>
+                    {(['hours', 'day', 'week', 'bi-week', 'month', 'year'] as ZoomLevel[]).map(z => (
+                        <button key={z} onClick={() => handleZoomChange(z)} style={{
+                            padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 6,
+                            border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                            background: zoom === z ? 'var(--text-primary)' : 'transparent',
+                            color: zoom === z ? 'var(--bg-color)' : 'var(--text-secondary)'
+                        }}>
+                            {z === 'bi-week' ? 'Bi-Week' : z.charAt(0).toUpperCase() + z.slice(1)}
+                        </button>
+                    ))}
                 </div>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Today button */}
-                    <button onClick={() => scrollRef.current?.scrollTo({ left: Math.max(0, todayOffset * colW - 300), behavior: 'smooth' })}
-                        style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--sidebar-bg)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-color)')}
-                    >
-                        Today
-                    </button>
-
-                    {/* Zoom */}
-                    <div style={{ display: 'flex', background: 'var(--bg-color)', padding: 2, borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                        {(['day', 'week', 'month'] as ZoomLevel[]).map(z => (
-                            <button key={z} onClick={() => setZoom(z)} style={{
-                                padding: '4px 12px', fontSize: 12, border: 'none', cursor: 'pointer', borderRadius: 6,
-                                background: zoom === z ? 'var(--text-primary)' : 'transparent',
-                                color: zoom === z ? 'var(--bg-color)' : 'var(--text-secondary)',
-                                fontWeight: zoom === z ? 600 : 500,
-                                transition: 'all 0.2s',
-                                textTransform: 'capitalize'
-                            }}>{z}</button>
-                        ))}
-                    </div>
+                {/* Navigation */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => navigate(-1)} style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border-color)', borderRadius: 6, background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>‹ Prev</button>
+                    <button onClick={() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); setStartDateStr(d.toISOString().slice(0, 10)); }} style={{ padding: '5px 10px', fontSize: 12, border: '1px solid #007aff', borderRadius: 6, background: 'rgba(0,122,255,0.08)', color: '#007aff', cursor: 'pointer', fontWeight: 600 }}>Today</button>
+                    <button onClick={() => navigate(1)} style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--border-color)', borderRadius: 6, background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Next ›</button>
                 </div>
             </div>
 
-            {/* ── Scrollable Timeline Body ── */}
-            <div ref={scrollRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
-                <div style={{ width: totalW, minWidth: '100%', position: 'relative' }}>
+            {/* Grid */}
+            <div style={{ display: 'flex', overflow: 'auto', position: 'relative' }} ref={gridRef}>
+                <div style={{ minWidth: LEFT_PANEL + totalDays * colW }}>
+                    <TimelineHeader
+                        topRowItems={topRowItems}
+                        bottomRowItems={bottomRowItems}
+                        zoom={zoom}
+                        leftPanelWidth={LEFT_PANEL}
+                    />
 
-                    {/* Header */}
-                    <TimelineHeader startDate={rangeStart} totalDays={totalDays} zoom={zoom} colW={colW} todayOffset={todayOffset} />
+                    {/* Background Grid */}
+                    <div style={{ position: 'absolute', top: HEADER_HEIGHT, left: LEFT_PANEL, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none' }}>
+                        {bottomRowItems.map((b, idx) => (
+                            <div key={idx} style={{ position: 'absolute', left: b.left, width: b.width, top: 0, bottom: 0, borderRight: '1px solid var(--border-color)', background: b.isWeekend ? 'rgba(0,0,0,0.015)' : 'transparent' }} />
+                        ))}
+                    </div>
 
-                    {/* Groups */}
-                    {groups.map(group => (
-                        <TimelineGroup
-                            key={group.label}
-                            label={group.label}
-                            contents={group.items}
-                            startDate={rangeStart}
-                            totalDays={totalDays}
-                            colW={colW}
-                            datePropId={datePropId}
-                            color={group.color}
-                            todayOffset={todayOffset}
-                            properties={properties}
-                        />
-                    ))}
-
-                    {/* Empty state inside grid */}
-                    {groups.every(g => g.items.length === 0) && (
-                        <div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            <div style={{ fontSize: 40, marginBottom: 16 }}>🗓️</div>
-                            <div style={{ fontSize: 15, fontWeight: 500 }}>No content matches your filters.</div>
-                        </div>
+                    {/* Today line */}
+                    {exactDaysFromStart >= 0 && exactDaysFromStart <= totalDays && (
+                        <div style={{
+                            position: 'absolute',
+                            left: LEFT_PANEL + exactDaysFromStart * colW,
+                            top: HEADER_HEIGHT,
+                            bottom: 0,
+                            width: 2,
+                            background: '#007aff',
+                            opacity: 0.6,
+                            pointerEvents: 'none',
+                            zIndex: 10
+                        }} />
                     )}
+
+                    {/* Rows */}
+                    {grouped.map(group => {
+                        const isCollapsed = collapsed[group.key];
+                        return (
+                            <div key={group.key}>
+                                {grouped.length > 1 && (
+                                    <div style={{
+                                        display: 'flex', height: GROUP_HEIGHT, alignItems: 'center',
+                                        background: `${group.color.bg}44`,
+                                        borderBottom: '1px solid var(--border-color)',
+                                        position: 'sticky', left: 0,
+                                    }}>
+                                        <div style={{
+                                            width: LEFT_PANEL, flexShrink: 0,
+                                            borderRight: '1px solid var(--border-color)',
+                                            display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px',
+                                            cursor: 'pointer'
+                                        }} onClick={() => setCollapsed(prev => ({ ...prev, [group.key]: !isCollapsed }))}>
+                                            <span style={{ display: 'flex', color: group.color.text }}>
+                                                {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                            </span>
+                                            <span style={{
+                                                display: 'inline-flex', padding: '2px 10px', borderRadius: 20,
+                                                background: group.color.bg, color: group.color.text,
+                                                fontSize: 12, fontWeight: 700
+                                            }}>{group.label}</span>
+                                        </div>
+                                        <div style={{ flex: 1, height: '100%' }} />
+                                    </div>
+                                )}
+
+                                {!isCollapsed && group.items.map(content => {
+                                    const cd = JSON.parse(content.customFields || '{}');
+                                    const isDragged = draggedItemId === content.id;
+
+                                    let barStart: number | null = null;
+                                    let barEnd: number | null = null;
+
+                                    if (usingFallbackDate) {
+                                        const s = content.createdAt ? new Date(content.createdAt) : null;
+                                        if (s && !isNaN(s.getTime())) {
+                                            barStart = daysBetween(startDate, s);
+                                            barEnd = barStart;
+                                        }
+                                    } else if (datePropId) {
+                                        const val = cd[datePropId] || '';
+                                        const [sPart, ePart] = val.includes(' → ') ? val.split(' → ') : [val, val];
+                                        const s = sPart ? new Date(sPart) : null;
+                                        const e = (ePart || sPart) ? new Date(ePart || sPart) : s;
+
+                                        if (s && !isNaN(s.getTime())) barStart = daysBetween(startDate, s);
+                                        if (e && !isNaN(e.getTime())) barEnd = daysBetween(startDate, e);
+                                    }
+
+                                    const hasBar = barStart !== null && barEnd !== null;
+                                    const barLeft = barStart !== null ? Math.max(0, barStart) : 0;
+                                    const barLen = (barStart !== null && barEnd !== null) ? Math.max(1, barEnd - barStart + 1) : 1;
+
+                                    let barColor = { bg: '#007aff', text: '#fff' };
+                                    if (groupPropId && cd[groupPropId]) {
+                                        const prop = properties.find(p => p.id === groupPropId);
+                                        const colorConfig = prop?.colorConfig ? JSON.parse(prop.colorConfig) : {};
+                                        const obj = getBadgeColorObj(cd[groupPropId], colorConfig);
+                                        barColor = { bg: obj.bg ?? '#007aff', text: obj.text ?? '#fff' };
+                                    }
+
+                                    const secondaryProp = properties.find(p => p.type === 'STATUS' || p.type === 'SELECT');
+                                    const secondaryVal = secondaryProp ? cd[secondaryProp.id] : null;
+                                    const secondaryColor = secondaryVal ? getBadgeColorObj(secondaryVal, JSON.parse(secondaryProp?.colorConfig || '{}')) : null;
+
+                                    return (
+                                        <div key={content.id} style={{
+                                            display: 'flex',
+                                            height: ROW_HEIGHT,
+                                            alignItems: 'center',
+                                            borderBottom: '1px solid var(--border-color)',
+                                            position: 'relative',
+                                            background: content.colorMatch ? `${content.colorMatch}0a` : 'transparent'
+                                        }}>
+                                            <div style={{
+                                                width: LEFT_PANEL, flexShrink: 0, borderRight: '1px solid var(--border-color)',
+                                                display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', overflow: 'hidden',
+                                                position: 'sticky', left: 0, background: content.colorMatch ? `${content.colorMatch}1a` : 'var(--bg-color)', zIndex: 10
+                                            }}>
+                                                <GripVertical size={12} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
+                                                <div onClick={() => onOpenContent ? onOpenContent(content.id) : router.push(`/content/${content.id}`)} style={{ flex: 1, overflow: 'hidden', cursor: 'pointer' }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>
+                                                        {content.title}
+                                                    </div>
+                                                    {secondaryVal && secondaryColor && (
+                                                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: secondaryColor.bg, color: secondaryColor.text, fontWeight: 600, display: 'inline-block', marginTop: 2 }}>
+                                                            {secondaryVal}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                style={{ flex: 1, position: 'relative', height: '100%', overflow: 'hidden' }}
+                                                onDragOver={e => { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setDragOverDayOffset(Math.floor((e.clientX - r.left) / colW)); }}
+                                                onDrop={handleGridDrop}
+                                            >
+                                                {hasBar && (
+                                                    <div
+                                                        draggable={!resizingItemId && !resizingSide}
+                                                        onDragStart={(e) => {
+                                                            if (resizingItemId || resizingSide) {
+                                                                e.preventDefault();
+                                                                return;
+                                                            }
+                                                            setDraggedItemId(content.id);
+                                                            // Workaround for HTML5 drag preview to set correctly before state update
+                                                            setTimeout(() => { }, 0);
+                                                        }}
+                                                        onDragEnd={() => { setDraggedItemId(null); setDragOverDayOffset(null); }}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            left: barLeft * colW + 4,
+                                                            width: barLen * colW - 8,
+                                                            top: '50%', transform: 'translateY(-50%)',
+                                                            height: 24, borderRadius: 6,
+                                                            background: isDragged ? 'rgba(0,0,0,0.1)' : (content.colorMatch ? `linear-gradient(135deg, ${content.colorMatch}, ${content.colorMatch}dd)` : `linear-gradient(135deg, ${barColor.bg}, ${barColor.bg}dd)`),
+                                                            border: isDragged ? '1px dashed var(--border-color)' : (content.colorMatch ? `1px solid ${content.colorMatch}` : `1px solid ${barColor.bg}`),
+                                                            cursor: resizingSide ? 'col-resize' : 'grab',
+                                                            zIndex: isDragged ? 1 : (resizingItemId === content.id ? 20 : 5),
+                                                            opacity: isDragged ? 0.4 : 1,
+                                                            display: 'flex', alignItems: 'center',
+                                                            boxShadow: isDragged ? 'none' : '0 4px 12px rgba(0,0,0,0.12)',
+                                                            transition: resizingItemId === content.id ? 'none' : 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                                        }}
+                                                        onMouseEnter={e => { if (!isDragged && !resizingItemId) e.currentTarget.style.transform = 'translateY(-50%) scaleY(1.1)'; }}
+                                                        onMouseLeave={e => { if (!isDragged && !resizingItemId) e.currentTarget.style.transform = 'translateY(-50%)'; }}
+                                                    >
+                                                        {/* Left Resize Handle */}
+                                                        <div
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setResizingItemId(content.id);
+                                                                setResizingSide('left');
+                                                                document.body.style.cursor = 'col-resize';
+                                                            }}
+                                                            style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 12, cursor: 'col-resize', zIndex: 10 }}
+                                                        />
+
+                                                        <div style={{ flex: 1, padding: '0 8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 700, color: barColor.text, pointerEvents: 'none' }}>
+                                                            {content.title}
+                                                        </div>
+
+                                                        {/* Right Resize Handle */}
+                                                        <div
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setResizingItemId(content.id);
+                                                                setResizingSide('right');
+                                                                document.body.style.cursor = 'col-resize';
+                                                            }}
+                                                            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 12, cursor: 'col-resize', zIndex: 10 }}
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {isDragged && dragOverDayOffset !== null && !resizingItemId && (
+                                                    <div style={{
+                                                        position: 'absolute', left: dragOverDayOffset * colW + 4, width: barLen * colW - 8,
+                                                        top: '50%', transform: 'translateY(-50%)', height: 24, background: 'rgba(0,122,255,0.15)',
+                                                        border: '2px dashed #007aff', borderRadius: 6, pointerEvents: 'none', zIndex: 2
+                                                    }} />
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
     );
 }
-

@@ -27,12 +27,6 @@ export default async function FeedPage() {
         include: { author: { select: { name: true } } }
     });
 
-    // Fetch the 50 most recently updated tasks
-    const tasks = await prisma.task.findMany({
-        orderBy: { updatedAt: 'desc' },
-        take: 50,
-        include: { assignee: { select: { name: true } }, project: { select: { name: true } } }
-    });
 
     // Fetch the 50 most recently updated projects
     const projects = await prisma.project.findMany({
@@ -58,21 +52,6 @@ export default async function FeedPage() {
         });
     });
 
-    tasks.forEach(t => {
-        const isNew = Math.abs(t.updatedAt.getTime() - t.createdAt.getTime()) < 5000;
-        let titleStr = t.title;
-        if (t.project) titleStr += ` (Project: ${t.project.name})`;
-        feedItems.push({
-            id: `task-${t.id}`,
-            type: 'task',
-            action: isNew ? 'created' : 'updated',
-            title: titleStr,
-            user: t.assignee?.name || 'System',
-            date: t.updatedAt,
-            link: '/tasks',
-            icon: <CheckCircle size={20} />
-        });
-    });
 
     projects.forEach(p => {
         const isNew = Math.abs(p.updatedAt.getTime() - p.createdAt.getTime()) < 5000;
@@ -105,7 +84,7 @@ export default async function FeedPage() {
                             <Inbox size={48} color="var(--text-secondary)" />
                         </div>
                         <h3 style={{ marginBottom: 8 }}>No activity yet</h3>
-                        <p>When tasks, content, or projects are created or updated, they will appear here.</p>
+                        <p>When content or projects are created or updated, they will appear here.</p>
                     </div>
                 ) : (
                     topFeedItems.map(item => (

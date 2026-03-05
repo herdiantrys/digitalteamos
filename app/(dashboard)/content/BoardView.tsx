@@ -3,30 +3,43 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EditableCell from './EditableCell';
+import { Trash2 } from 'lucide-react';
+import { deleteContent } from '../../../lib/content-actions';
+import PermissionWarningModal from './PermissionWarningModal';
 
 export default function BoardView({
     contents,
     properties,
-    userOptionsRaw
+    userOptionsRaw,
+    onOpenContent,
+    colorConfigMap,
+    viewSettings,
+    currentUser,
 }: {
     contents: any[];
     properties: any[];
     userOptionsRaw: string;
+    onOpenContent?: (id: string) => void;
+    colorConfigMap?: Record<string, string | null>;
+    viewSettings?: any;
+    currentUser?: any;
 }) {
     const router = useRouter();
+    const [showWarning, setShowWarning] = useState(false);
     // We need to pick a property to group by. Let's look for STATUS first, then SELECT.
-    const groupableProps = properties.filter(p => p.type === 'STATUS' || p.type === 'SELECT');
+    const groupableProps = properties.filter(p => ['STATUS', 'SELECT', 'MULTI_SELECT', 'PERSON'].includes(p.type));
 
-    const [groupByPropId, setGroupByPropId] = useState<string | null>(
-        groupableProps.length > 0 ? groupableProps[0].id : null
-    );
+    // Use viewSettings.groupBy if it's a valid groupable property, otherwise fallback
+    const groupByPropId = (viewSettings?.groupBy && groupableProps.some(p => p.id === viewSettings.groupBy))
+        ? viewSettings.groupBy
+        : (groupableProps.length > 0 ? groupableProps[0].id : null);
 
-    if (groupableProps.length === 0) {
+    if (!groupByPropId || groupableProps.length === 0) {
         return (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)', background: 'var(--sidebar-bg)', borderRadius: 8 }}>
-                No Select properties available for Board Grouping.
+                No compatible properties available for Board Grouping.
                 <br />
-                <span style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Create a property of type SELECT in Team Settings first.</span>
+                <span style={{ fontSize: 12, marginTop: 8, display: 'block' }}>Create a property of type STATUS, SELECT, MULTI_SELECT, or PERSON first.</span>
             </div>
         );
     }
@@ -34,7 +47,7 @@ export default function BoardView({
     const activeProp = properties.find(p => p.id === groupByPropId);
     if (!activeProp) return null;
 
-    const options = activeProp.options ? JSON.parse(activeProp.options) : [];
+    const options = activeProp.options ? JSON.parse(activeProp.options) : (activeProp.type === 'PERSON' ? userOptionsRaw.split(',').map(s => s.trim()) : []);
 
     // Create columns: one for each option, plus an 'Uncategorized' column
     const columns: Record<string, any[]> = { 'Uncategorized': [] };
@@ -43,34 +56,28 @@ export default function BoardView({
     contents.forEach(content => {
         const customData = content.customFields ? JSON.parse(content.customFields) : {};
         const val = customData[activeProp.id];
-        if (val && columns[val]) {
-            columns[val].push(content);
+
+        if (activeProp.type === 'MULTI_SELECT' || activeProp.type === 'PERSON') {
+            const vals = val ? val.split(',').map((v: string) => v.trim()).filter(Boolean) : [];
+            if (vals.length > 0) {
+                vals.forEach((v: string) => {
+                    if (columns[v]) columns[v].push(content);
+                    else columns['Uncategorized'].push(content);
+                });
+            } else {
+                columns['Uncategorized'].push(content);
+            }
         } else {
-            columns['Uncategorized'].push(content);
+            if (val && columns[val]) {
+                columns[val].push(content);
+            } else {
+                columns['Uncategorized'].push(content);
+            }
         }
     });
 
     return (
         <div>
-            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Group by:</span>
-                <select
-                    value={groupByPropId || ''}
-                    onChange={(e) => setGroupByPropId(e.target.value)}
-                    style={{
-                        padding: '4px 8px',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 4,
-                        background: 'var(--bg-color)',
-                        color: 'var(--text-primary)',
-                        fontSize: 13
-                    }}
-                >
-                    {groupableProps.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
-            </div>
 
             <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16 }}>
                 {Object.keys(columns).map(columnName => {
@@ -96,44 +103,77 @@ export default function BoardView({
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {colItems.map((item: any) => (
-                                    <div key={item.id} style={{
-                                        background: 'var(--bg-color)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: 6,
-                                        padding: 12,
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                    }}>
-                                        <h5
-                                            onClick={() => router.push(`/content/${item.id}`)}
-                                            style={{ margin: 0, fontSize: 14, marginBottom: 8, cursor: 'pointer', color: 'var(--text-primary)', transition: 'color 0.1s' }}
-                                            onMouseEnter={e => e.currentTarget.style.color = '#1890ff'}
-                                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
-                                        >
-                                            {item.title}
-                                        </h5>
+                                {colItems.map((item: any) => {
+                                    const cd = item.customFields ? JSON.parse(item.customFields) : {};
+                                    return (
+                                        <div key={item.id} style={{
+                                            background: item.colorMatch ? `${item.colorMatch}1a` : 'var(--bg-color)',
+                                            border: item.colorMatch ? `1px solid ${item.colorMatch}` : '1px solid var(--border-color)',
+                                            borderRadius: 6,
+                                            padding: 12,
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                                                <h5
+                                                    onClick={() => onOpenContent ? onOpenContent(item.id) : router.push(`/content/${item.id}`)}
+                                                    style={{ margin: 0, fontSize: 14, cursor: 'pointer', color: 'var(--text-primary)', transition: 'color 0.1s', flex: 1 }}
+                                                    onMouseEnter={e => e.currentTarget.style.color = '#1890ff'}
+                                                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                                                >
+                                                    {item.title}
+                                                </h5>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        const canDelete = currentUser?.role === 'ADMIN' || (currentUser?.id && item.authorId === currentUser.id);
+                                                        if (!canDelete) {
+                                                            setShowWarning(true);
+                                                            return;
+                                                        }
+                                                        if (confirm(`Delete this content?`)) {
+                                                            await deleteContent({ id: item.id });
+                                                            router.refresh();
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        padding: '4px', background: 'transparent', border: 'none',
+                                                        color: 'var(--text-secondary)', cursor: 'pointer', borderRadius: 4,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}
+                                                    onMouseEnter={e => (e.currentTarget.style.color = '#ff4d4f')}
+                                                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                                            {properties.filter(p => p.id !== activeProp.id).slice(0, 3).map(p => {
-                                                const cd = item.customFields ? JSON.parse(item.customFields) : {};
-                                                return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                                                {properties.filter(p => p.id !== activeProp.id).slice(0, 3).map(p => (
                                                     <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                         <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{p.name}</span>
                                                         <div style={{ padding: '0 4px' }}>
                                                             <EditableCell
                                                                 contentId={item.id}
                                                                 propId={p.id}
-                                                                type={p.type}
-                                                                optionsRaw={p.type === 'PERSON' ? userOptionsRaw : p.options}
                                                                 initialValue={cd[p.id]}
+                                                                type={p.type}
+                                                                optionsRaw={p.options}
+                                                                propertyId={p.id}
+                                                                colorConfigRaw={(p as any).colorConfig}
                                                             />
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
+                                                ))}
+                                            </div>
+
+                                            <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: 10, color: 'var(--text-secondary)', opacity: 0.6 }}>#{item.id.slice(-4)}</span>
+                                                {item.author && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{item.author.name}</span>}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {colItems.length === 0 && (
                                     <div style={{ padding: 24, textAlign: 'center', color: 'var(--border-color)', fontSize: 12 }}>
                                         Empty
@@ -144,6 +184,10 @@ export default function BoardView({
                     )
                 })}
             </div>
+            <PermissionWarningModal
+                isOpen={showWarning}
+                onClose={() => setShowWarning(false)}
+            />
         </div>
     );
 }

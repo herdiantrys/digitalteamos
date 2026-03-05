@@ -36,7 +36,7 @@ export async function updatePropertyDefinition(id: string, name: string, type: s
 
     await prisma.propertyDefinition.update({
         where: { id },
-        data: { name, options } // Generally we don't allow changing type, just name/options, but allowing type requires UI changes. We'll stick to name/options for safety
+        data: { name, type, options }
     });
 
     revalidatePath('/settings');
@@ -76,4 +76,16 @@ export async function reorderProperties(orderedIds: string[]) {
     );
 
     revalidatePath('/settings');
+}
+
+export async function updatePropertyColorConfig(id: string, colorConfig: string) {
+    await requireAdmin();
+
+    await prisma.propertyDefinition.update({
+        where: { id },
+        data: { colorConfig }
+    });
+
+    revalidatePath('/settings');
+    revalidatePath('/content');
 }

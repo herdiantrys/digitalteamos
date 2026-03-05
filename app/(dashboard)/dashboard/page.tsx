@@ -18,30 +18,16 @@ export default async function DashboardPage() {
     const totalProjects = projectStats.reduce((acc, curr) => acc + curr._count.id, 0);
     const completedProjects = projectStats.find(s => s.status === 'COMPLETED')?._count.id || 0;
 
-    // Task Metrics
-    const taskStats = await prisma.task.groupBy({
-        by: ['status'],
-        _count: { id: true }
-    });
-    const totalTasks = taskStats.reduce((acc, curr) => acc + curr._count.id, 0);
-    const todoTasks = taskStats.find(s => s.status === 'TODO')?._count.id || 0;
-    const inProgressTasks = taskStats.find(s => s.status === 'IN_PROGRESS')?._count.id || 0;
-    const doneTasks = taskStats.find(s => s.status === 'DONE')?._count.id || 0;
 
     // Content Metrics
     const totalContent = await prisma.content.count();
 
     // Fetch Recent Activity (Limit to 5)
-    const recentTasks = await prisma.task.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: { assignee: true, project: true }
-    });
 
     const recentContentRaw = await prisma.content.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: { author: true }
+        include: { author: { select: { id: true, name: true } } }
     });
 
     return (
@@ -68,14 +54,6 @@ export default async function DashboardPage() {
                     color="hsl(210, 100%, 65%)"
                 />
 
-                <MetricCard
-                    title="Active Tasks"
-                    value={todoTasks + inProgressTasks}
-                    subtitle={`${doneTasks} Completed out of ${totalTasks} total`}
-                    icon="☑"
-                    link="/tasks"
-                    color="hsl(150, 80%, 40%)"
-                />
 
                 <MetricCard
                     title="Projects"
@@ -97,32 +75,8 @@ export default async function DashboardPage() {
 
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
 
-                {/* Recent Tasks List */}
-                <div className="glass-card" style={{ padding: 24 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 18, fontWeight: 600 }}>Recent Tasks</h3>
-                        <Link href="/tasks" style={{ fontSize: 13, color: 'var(--text-secondary)', textDecoration: 'none' }}>View All →</Link>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {recentTasks.length === 0 ? (
-                            <div style={{ fontSize: 14, color: 'var(--text-secondary)', padding: '24px 0', textAlign: 'center' }}>No tasks found.</div>
-                        ) : recentTasks.map(task => (
-                            <Link href={`/tasks/${task.id}`} key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: 8, background: 'var(--sidebar-bg)', textDecoration: 'none', color: 'inherit', border: '1px solid transparent', transition: 'border-color 0.2s' }} className="hover-border">
-                                <div>
-                                    <div style={{ fontWeight: 500, marginBottom: 4 }}>{task.title}</div>
-                                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        {task.project && <span style={{ background: 'var(--bg-color)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-color)' }}>{task.project.name}</span>}
-                                        <span>{task.assignee?.name || 'Unassigned'}</span>
-                                    </div>
-                                </div>
-                                <StatusBadge status={task.status} />
-                            </Link>
-                        ))}
-                    </div>
-                </div>
 
                 {/* Recent Content List */}
                 <div className="glass-card" style={{ padding: 24 }}>

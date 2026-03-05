@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Radio, Clapperboard, Timer, FolderOpen, Settings } from 'lucide-react';
+import { LayoutDashboard, Radio, Clapperboard, FolderOpen, Settings } from 'lucide-react';
 
 export default function Sidebar({ userName = 'User', userRole = 'STAFF' }: { userName?: string, userRole?: string }) {
     const pathname = usePathname();
@@ -10,7 +10,6 @@ export default function Sidebar({ userName = 'User', userRole = 'STAFF' }: { use
         { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={18} /> },
         { name: 'Feed', path: '/feed', icon: <Radio size={18} /> },
         { name: 'Content Management', path: '/content', icon: <Clapperboard size={18} /> },
-        { name: 'Tasks', path: '/tasks', icon: <Timer size={18} /> },
         { name: 'Projects', path: '/projects', icon: <FolderOpen size={18} /> },
     ];
 
@@ -45,19 +44,21 @@ export default function Sidebar({ userName = 'User', userRole = 'STAFF' }: { use
             </div>
 
             {/* Premium User Profile Badge */}
-            <div className="user-profile-badge">
-                <div className="avatar">
-                    {userName ? userName.charAt(0).toUpperCase() : 'U'}
+            <Link href="/profile" style={{ textDecoration: 'none' }}>
+                <div className="user-profile-badge">
+                    <div className="avatar">
+                        {userName ? userName.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                            {userName}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                            LAN Mode Active
+                        </span>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {userName}
-                    </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                        LAN Mode Active
-                    </span>
-                </div>
-            </div>
+            </Link>
         </aside>
     );
 }
