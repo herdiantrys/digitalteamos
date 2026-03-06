@@ -535,3 +535,111 @@ h1.page-title {
   scrollbar-width: none;
   /* Firefox */
 }
+
+/* Task Notification Badge with Glow and Blink */
+.task-badge {
+  background: #ff4d4f;
+  color: white;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  box-shadow: 0 0 8px rgba(255, 77, 79, 0.6);
+  animation: pulse-glow 1.5s infinite ease-in-out;
+  margin-left: auto;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 4px rgba(255, 77, 79, 0.4);
+    opacity: 0.8;
+  }
+
+  50% {
+    box-shadow: 0 0 12px rgba(255, 77, 79, 0.8);
+    opacity: 1;
+  }
+
+  100% {
+    box-shadow: 0 0 4px rgba(255, 77, 79, 0.4);
+    opacity: 0.8;
+  }
+}
+
+.task-badge-done {
+  background: #10b981;
+  color: white;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+/* Premium Feed Activity Cards */
+.feed-card-premium {
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.feed-card-premium:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  border-color: var(--accent-color);
+}
+
+.feed-icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
+}
+
+.feed-card-premium:hover .feed-icon-container {
+  transform: rotate(-5deg) scale(1.1);
+}
+
+.feed-type-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  display: inline-block;
+}
+
+.new-activity-tag {
+  background: #ff4d4f;
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+  box-shadow: 0 0 8px rgba(255, 77, 79, 0.4);
+}

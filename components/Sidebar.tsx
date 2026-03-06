@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { LayoutDashboard, Radio, Clapperboard, FolderOpen, Settings, ChevronDown, Plus, Check, Database, Users, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Radio, Clapperboard, FolderOpen, Settings, ChevronDown, Plus, Check, Database, Users, CheckSquare, BarChart2 } from 'lucide-react';
 import { switchWorkspace, createWorkspace } from '../lib/workspace-actions';
 import LucideIcon from './LucideIcon';
 
@@ -12,12 +12,16 @@ export default function Sidebar({
     workspaces = [],
     activeWorkspaceId = null,
     databases = [],
+    unfinishedTaskCount = 0,
+    isAllTasksDone = false
 }: {
     userName?: string,
     userRole?: string,
     workspaces?: any[],
     activeWorkspaceId?: string | null,
     databases?: { id: string; name: string; icon: string | null; iconColor: string | null }[],
+    unfinishedTaskCount?: number;
+    isAllTasksDone?: boolean;
 }) {
     const pathname = usePathname();
     const [isPending, startTransition] = useTransition();
@@ -67,6 +71,7 @@ export default function Sidebar({
     ];
 
     if (userRole === 'ADMIN') {
+        navItems.push({ name: 'Analytics', path: '/analytics', icon: <BarChart2 size={18} /> });
         navItems.push({ name: 'Settings', path: '/settings', icon: <Settings size={18} /> });
     }
 
@@ -93,25 +98,45 @@ export default function Sidebar({
                         <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: isSwitcherOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                     </div>
                 ) : (
-                    // STAFF: static workspace name only (no switching)
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px' }}>
-                        <div style={{ width: 24, height: 24, background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))', borderRadius: 6, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>
-                            {activeWorkspace?.logo ? <LucideIcon name={activeWorkspace.logo} size={14} /> : activeWorkspaceInitials}
+                    // STAFF: show switcher if they belong to >1 workspace, otherwise static
+                    workspaces.length > 1 ? (
+                        <div
+                            onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', cursor: 'pointer', padding: '6px 8px', borderRadius: 8, transition: 'background 0.2s', margin: '-6px -8px' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(55, 53, 47, 0.04)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                            <div style={{ width: 24, height: 24, background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))', borderRadius: 6, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>
+                                {activeWorkspace?.logo ? <LucideIcon name={activeWorkspace.logo} size={14} /> : activeWorkspaceInitials}
+                            </div>
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>{activeWorkspaceName}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Users size={10} /> {workspaces.length} workspaces
+                                </div>
+                            </div>
+                            <ChevronDown size={14} style={{ color: 'var(--text-secondary)', transform: isSwitcherOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </div>
-                        <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>{activeWorkspaceName}</div>
-                            <div style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <Users size={10} /> Team Workspace
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px' }}>
+                            <div style={{ width: 24, height: 24, background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))', borderRadius: 6, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>
+                                {activeWorkspace?.logo ? <LucideIcon name={activeWorkspace.logo} size={14} /> : activeWorkspaceInitials}
+                            </div>
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>{activeWorkspaceName}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Users size={10} /> Team Workspace
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )
                 )}
 
-                {/* Admin-only: workspace switcher dropdown */}
-                {isAdmin && isSwitcherOpen && (
+                {/* Workspace switcher dropdown — shown for both ADMIN and STAFF with multiple workspaces */}
+                {isSwitcherOpen && (
                     <div className="topbar-popover" style={{ top: 'calc(100% - 16px)', left: 12, right: 12, width: 'auto', minWidth: 260 }}>
                         <div style={{ padding: '8px 16px', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)' }}>
-                            Workspaces
+                            Switch Workspace
                         </div>
                         <div style={{ padding: '8px 0', maxHeight: 300, overflowY: 'auto' }}>
                             {workspaces.map(w => (
@@ -131,12 +156,15 @@ export default function Sidebar({
                                 </div>
                             ))}
                         </div>
-                        <div style={{ padding: '8px 0', borderTop: '1px solid var(--border-color)' }}>
-                            <div className="topbar-popover-item" onClick={handleCreateWorkspace}>
-                                <Plus size={16} color="var(--text-secondary)" />
-                                Create workspace
+                        {/* Only admins can create new workspaces */}
+                        {isAdmin && (
+                            <div style={{ padding: '8px 0', borderTop: '1px solid var(--border-color)' }}>
+                                <div className="topbar-popover-item" onClick={handleCreateWorkspace}>
+                                    <Plus size={16} color="var(--text-secondary)" />
+                                    Create workspace
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -149,9 +177,21 @@ export default function Sidebar({
                             key={item.path}
                             href={item.path}
                             className={`nav-item ${isActive ? 'active' : ''}`}
+                            style={{ display: 'flex', alignItems: 'center', width: '100%' }}
                         >
                             <span className="nav-icon">{item.icon}</span>
-                            {item.name}
+                            <span style={{ flex: 1 }}>{item.name}</span>
+                            {item.name === 'Tasks' && (
+                                <>
+                                    {unfinishedTaskCount > 0 ? (
+                                        <span className="task-badge">{unfinishedTaskCount}</span>
+                                    ) : isAllTasksDone ? (
+                                        <div className="task-badge-done">
+                                            <Check size={12} strokeWidth={4} />
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
                         </Link>
                     );
                 })}

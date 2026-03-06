@@ -196,13 +196,27 @@ export default function CalendarView({
         return null;
     }, []);
 
+    const canEditItem = useCallback((item: any) => {
+        if (currentUser?.role === 'ADMIN') return true;
+        if (item.authorId === currentUser?.id) return true;
+
+        const customFields = (() => { try { return JSON.parse(item.customFields || '{}'); } catch { return {}; } })();
+        const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+        return personFields.some(id => {
+            const val = customFields[id];
+            if (!val) return false;
+            return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+        });
+    }, [currentUser, properties]);
+
     const startResize = useCallback((e: React.MouseEvent, item: any, side: 'left' | 'right') => {
         e.preventDefault(); e.stopPropagation();
+        if (!canEditItem(item)) return;
         const r = ranges[item.id]; if (!r) return;
         resizeRef.current = { id: item.id, side, origStart: new Date(r.start), origEnd: new Date(r.end) };
         setResizeId(item.id);
         setHoverCard(item.id);
-    }, [ranges]);
+    }, [ranges, canEditItem]);
 
     useEffect(() => {
         if (!resizeId) return;
@@ -584,8 +598,12 @@ export default function CalendarView({
                     return (
                         <div
                             key={item.id}
-                            draggable={!isRes}
+                            draggable={!isRes && canEditItem(item)}
                             onDragStart={e => {
+                                if (!canEditItem(item)) {
+                                    e.preventDefault();
+                                    return;
+                                }
                                 const grabDateStr = winStrs[sc];
                                 dragOffsetRef.current = grabDateStr ? Math.max(0, daysBetween(r.start, new Date(grabDateStr))) : 0;
                                 e.dataTransfer.setData('text/plain', item.id);

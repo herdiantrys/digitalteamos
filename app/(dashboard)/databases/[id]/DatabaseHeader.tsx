@@ -19,23 +19,26 @@ interface Database {
     description: string | null;
     contentHeaderTemplate: string | null;
     contentFooterTemplate: string | null;
+    workspaceId: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export default function DatabaseHeader({
     database,
-    userRole,
+    currentUser,
     properties,
     userOptionsRaw
 }: {
     database: Database;
-    userRole: string;
+    currentUser: any;
     properties: any[];
     userOptionsRaw: string;
 }) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [pending, startTransition] = useTransition();
     const router = useRouter();
-    const isAdmin = userRole === 'ADMIN';
+    const isAdmin = currentUser?.role === 'ADMIN';
 
     function handleDelete() {
         if (!confirm(`Delete "${database.name}"? This will permanently delete all items, properties and views inside.`)) return;
@@ -93,12 +96,13 @@ export default function DatabaseHeader({
                         properties={properties}
                         userOptionsRaw={userOptionsRaw}
                         databaseId={database.id}
+                        currentUser={currentUser}
                     />
                     <div style={{ width: 1, height: 24, background: 'var(--border-color)', margin: '0 4px' }} />
 
                     {isAdmin && (
                         <>
-                            <DatabaseImportExportPanel databaseId={database.id} userRole={userRole} />
+                            <DatabaseImportExportPanel databaseId={database.id} userRole={currentUser?.role} />
                             <button
                                 onClick={() => setIsEditModalOpen(true)}
                                 title="Edit database"

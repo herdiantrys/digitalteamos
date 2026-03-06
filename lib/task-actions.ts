@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from './auth';
 import { revalidatePath } from 'next/cache';
+import { recordTaskHistory } from './history-actions';
 
 const prisma = new PrismaClient();
 
@@ -44,6 +45,14 @@ export async function createTask(formData: FormData) {
         }
     });
 
+    await recordTaskHistory(
+        task.id,
+        task,
+        `Created task: ${title}`,
+        user.name || user.email,
+        user.id
+    );
+
     revalidatePath('/tasks');
     return task;
 }
@@ -61,6 +70,14 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
         data: { status: newStatus }
     });
 
+    await recordTaskHistory(
+        taskId,
+        { status: newStatus },
+        `Changed status to ${newStatus}`,
+        user.name || user.email,
+        user.id
+    );
+
     revalidatePath('/tasks');
 }
 
@@ -75,6 +92,37 @@ export async function updateTaskDueDate(taskId: string, dueDate: Date | null) {
         where: { id: taskId },
         data: { dueDate }
     });
+
+    await recordTaskHistory(
+        taskId,
+        { dueDate },
+        `Changed due date to ${dueDate ? dueDate.toLocaleDateString() : 'None'}`,
+        user.name || user.email,
+        user.id
+    );
+
+    revalidatePath('/tasks');
+}
+
+export async function updateTaskDates(taskId: string, startDate: Date | null, dueDate: Date | null) {
+    const { task, user } = await validateTaskAccess(taskId);
+
+    if (user.role !== 'ADMIN' && task.assigneeId !== user.id) {
+        throw new Error('Unauthorized: You can only update tasks assigned to you.');
+    }
+
+    await prisma.task.update({
+        where: { id: taskId },
+        data: { startDate, dueDate }
+    });
+
+    await recordTaskHistory(
+        taskId,
+        { startDate, dueDate },
+        `Updated task dates`,
+        user.name || user.email,
+        user.id
+    );
 
     revalidatePath('/tasks');
 }
@@ -134,19 +182,28 @@ export async function updateTask(taskId: string, formData: FormData) {
         if (isNaN(dueDate.getTime())) dueDate = null;
     }
 
-    await prisma.task.update({
+    const updatedTask = await prisma.task.update({
         where: { id: taskId },
         data: {
             title,
             description,
             priority,
             status,
+            startDate: null,
             dueDate,
             assigneeId: assigneeId || null,
             relatedItemId: relatedItemId || null,
             content,
         }
     });
+
+    await recordTaskHistory(
+        taskId,
+        updatedTask,
+        `Updated task details`,
+        user.name || user.email,
+        user.id
+    );
 
     revalidatePath('/tasks');
 }

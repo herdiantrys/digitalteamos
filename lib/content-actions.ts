@@ -7,6 +7,41 @@ import { recordContentHistory } from './history-actions';
 
 const prisma = new PrismaClient();
 
+async function hasEditPermission(contentId: string, user: any) {
+    if (user.role === 'ADMIN') return true;
+
+    const content = await prisma.content.findUnique({
+        where: { id: contentId },
+        include: {
+            database: {
+                include: {
+                    properties: {
+                        where: { type: 'PERSON' }
+                    }
+                }
+            }
+        }
+    });
+
+    if (!content) return false;
+    if (content.authorId === user.id) return true;
+
+    // Check PERSON properties
+    if (content.databaseId && content.customFields) {
+        const customFields = JSON.parse(content.customFields);
+        const personProps = content.database?.properties || [];
+        for (const prop of personProps) {
+            const val = customFields[prop.id];
+            if (val) {
+                const assignedIds = String(val).split(',').map(s => s.trim());
+                if (assignedIds.includes(user.id)) return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 export async function getContentById(id: string) {
     await requireAuth();
     return await prisma.content.findUnique({
@@ -68,7 +103,11 @@ export async function createContent(formData: FormData) {
 }
 
 export async function updateContentField(contentId: string, customFieldsJson: string) {
-    await requireAuth();
+    const user = await requireAuth();
+
+    if (!(await hasEditPermission(contentId, user))) {
+        throw new Error('Unauthorized: You do not have permission to edit this content.');
+    }
 
     await prisma.content.update({
         where: { id: contentId },
@@ -82,9 +121,13 @@ export async function updateContentField(contentId: string, customFieldsJson: st
 export async function updateSingleContentField(contentId: string, propId: string, value: any) {
     const user = await requireAuth();
 
+    if (!(await hasEditPermission(contentId, user))) {
+        throw new Error('Unauthorized: You do not have permission to edit this content.');
+    }
+
     const content = await prisma.content.findUnique({
         where: { id: contentId },
-        select: { title: true, caption: true, customFields: true }
+        select: { title: true, caption: true, customFields: true, authorId: true }
     });
     if (!content) return;
 
@@ -96,7 +139,8 @@ export async function updateSingleContentField(contentId: string, propId: string
         contentId,
         content,
         `Changed field: ${propId.slice(0, 8)}… · "${oldVal}" → "${newVal}"`,
-        user.name ?? user.email
+        user.name ?? user.email,
+        user.id
     );
 
     const currentFields = { ...oldFields };
@@ -159,14 +203,21 @@ export async function updateContentMain(id: string, data: { title?: string; capt
     // Snapshot before change
     const current = await prisma.content.findUnique({
         where: { id },
-        select: { title: true, caption: true, customFields: true }
+        select: { title: true, caption: true, customFields: true, authorId: true }
     });
+
+    const isAllowed = await hasEditPermission(id, user);
+
     if (current) {
+        if (!isAllowed) {
+            throw new Error('Unauthorized: You do not have permission to edit this content.');
+        }
+
         const parts: string[] = [];
         if (data.title && data.title !== current.title) parts.push(`Title: "${current.title}" → "${data.title}"`);
         if (data.caption !== undefined && data.caption !== current.caption) parts.push('Caption updated');
         if (parts.length > 0) {
-            await recordContentHistory(id, current, parts.join(', '), user.name ?? user.email);
+            await recordContentHistory(id, current, parts.join(', '), user.name ?? user.email, user.id);
         }
     }
 
@@ -225,7 +276,8 @@ export async function bulkUpdateContentProperty(ids: string[], propId: string, v
             item.id,
             item,
             `Bulk Edit field ${propId.slice(0, 8)}: "${oldVal}" → "${newVal}"`,
-            user.name ?? user.email
+            user.name ?? user.email,
+            user.id
         );
 
         const updatedFields = { ...currentFields };

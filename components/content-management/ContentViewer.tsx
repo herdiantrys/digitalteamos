@@ -836,6 +836,7 @@ export default function ContentViewer({
                 properties={properties}
                 userOptionsRaw={userOptionsRaw}
                 database={database}
+                currentUser={currentUser}
             />
 
             {/* ── ViewSettings Portal — rendered at body level to avoid overflow clipping ── */}

@@ -162,6 +162,18 @@ export default function BoardView({
                                                                 optionsRaw={p.options}
                                                                 propertyId={p.id}
                                                                 colorConfigRaw={(p as any).colorConfig}
+                                                                disabled={(() => {
+                                                                    if (currentUser?.role === 'ADMIN') return false;
+                                                                    if (item.authorId === currentUser?.id) return false;
+
+                                                                    const customFields = (() => { try { return JSON.parse(item.customFields || '{}'); } catch { return {}; } })();
+                                                                    const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+                                                                    return !personFields.some(id => {
+                                                                        const val = customFields[id];
+                                                                        if (!val) return false;
+                                                                        return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+                                                                    });
+                                                                })()}
                                                             />
                                                         </div>
                                                     </div>

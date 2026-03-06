@@ -14,6 +14,7 @@ export default function EditableCell({
     optionsRaw,
     propertyId,
     colorConfigRaw,
+    disabled,
 }: {
     contentId: string,
     propId: string,
@@ -22,9 +23,11 @@ export default function EditableCell({
     optionsRaw: string | null,
     propertyId?: string,
     colorConfigRaw?: string | null,
+    disabled?: boolean,
 }) {
     const [value, setValue] = useState(initialValue ?? '');
     const [isSaving, setIsSaving] = useState(false);
+    const isEditingDisabled = disabled || isSaving;
 
     // Sync state if initialValue changes externally (e.g., drag-to-fill)
     useEffect(() => {
@@ -51,8 +54,8 @@ export default function EditableCell({
         width: '100%',
         height: 32,
         transition: 'all 0.2s',
-        opacity: isSaving ? 0.5 : 1,
-        cursor: 'text',
+        opacity: disabled ? 0.7 : isSaving ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'text',
         boxSizing: 'border-box',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
@@ -76,6 +79,7 @@ export default function EditableCell({
                     onChange={(newSel) => handleSave(newSel.length > 0 ? newSel.join(', ') : '')}
                     propertyId={propertyId}
                     colorConfigRaw={colorConfigRaw}
+                    disabled={isEditingDisabled}
                 />
             </div>
         );
@@ -98,6 +102,7 @@ export default function EditableCell({
                     placeholder="-"
                     propertyId={propertyId}
                     colorConfigRaw={colorConfigRaw}
+                    disabled={isEditingDisabled}
                 />
             </div>
         );
@@ -126,6 +131,7 @@ export default function EditableCell({
                         placeholder="-"
                         propertyId={propertyId}
                         colorConfigRaw={colorConfigRaw}
+                        disabled={isEditingDisabled}
                     />
                 </div>
             );
@@ -140,7 +146,7 @@ export default function EditableCell({
                 onBlur={() => handleSave(value)}
                 placeholder="-"
                 style={baseStyle}
-                disabled={isSaving}
+                disabled={isEditingDisabled}
             />
         );
     }
@@ -152,15 +158,15 @@ export default function EditableCell({
                 type="checkbox"
                 checked={value === 'true' || value === true}
                 onChange={(e) => handleSave(e.target.checked ? 'true' : 'false')}
-                style={{ cursor: 'pointer' }}
-                disabled={isSaving}
+                style={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
+                disabled={isEditingDisabled}
             />
         );
     }
 
     // ── DATE (Notion-style Range) ───────────────────────────────────────────
     if (type === 'DATE') {
-        return <DateRangeCell contentId={contentId} propId={propId} initialValue={value} onSave={handleSave} isSaving={isSaving} />;
+        return <DateRangeCell contentId={contentId} propId={propId} initialValue={value} onSave={handleSave} isSaving={isSaving} disabled={isEditingDisabled} />;
     }
 
     // ── URL ───────────────────────────────────────────────────────────────────
@@ -174,7 +180,7 @@ export default function EditableCell({
                     onBlur={() => handleSave(value)}
                     placeholder="-"
                     style={baseStyle}
-                    disabled={isSaving}
+                    disabled={isEditingDisabled}
                 />
                 {value && <a href={value} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', color: '#1890ff', flexShrink: 0 }}><ExternalLink size={14} /></a>}
             </div>
@@ -190,7 +196,7 @@ export default function EditableCell({
             onBlur={() => handleSave(value)}
             placeholder="-"
             style={baseStyle}
-            disabled={isSaving}
+            disabled={isEditingDisabled}
             onFocus={e => { (e.target as HTMLInputElement).style.border = '1px solid var(--border-color)'; (e.target as HTMLInputElement).style.background = 'var(--bg-color)'; }}
             onBlurCapture={e => { (e.target as HTMLInputElement).style.border = '1px solid transparent'; (e.target as HTMLInputElement).style.background = 'transparent'; }}
         />
@@ -205,13 +211,15 @@ function DateRangeCell({
     propId,
     initialValue,
     onSave,
-    isSaving
+    isSaving,
+    disabled
 }: {
     contentId: string;
     propId: string;
     initialValue: any;
     onSave: (val: string) => void;
     isSaving: boolean;
+    disabled?: boolean;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -235,6 +243,7 @@ function DateRangeCell({
     }, [initialValue]);
 
     const toggleOpen = () => {
+        if (disabled) return;
         if (!isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             setPopoverPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
@@ -281,7 +290,7 @@ function DateRangeCell({
                     borderRadius: 4,
                     fontSize: 13,
                     color: valStr ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

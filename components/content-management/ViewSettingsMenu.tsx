@@ -45,6 +45,7 @@ export default function ViewSettingsMenu({
     initialPanel?: 'main' | 'layout' | 'properties' | 'group' | 'filter' | 'sort' | 'colors';
     currentUser?: any;
 }) {
+    const isAdmin = currentUser?.role === 'ADMIN';
     const [panel, setPanel] = useState<Panel>(initialPanel || 'main');
     const [name, setName] = useState(view.name);
     const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,7 +130,6 @@ export default function ViewSettingsMenu({
         try { await deleteContentView(view.id); onClose(); } catch (e) { console.error(e); }
     };
 
-    const currentLayout = VIEW_LAYOUTS.find(l => l.id === view.layout) || VIEW_LAYOUTS[0];
     const groupableProps = properties.filter(p => ['SELECT', 'MULTI_SELECT', 'STATUS', 'PERSON'].includes(p.type));
 
     // Shared styles
@@ -198,7 +198,7 @@ export default function ViewSettingsMenu({
                     <div style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontSize: 13 }}>No properties found.</div>
                 )}
             </div>
-            {databaseId && (
+            {isAdmin && databaseId && (
                 <div style={{ borderTop: '1px solid var(--border-color)', padding: '8px 14px' }}>
                     <CreatePropertyModal databaseId={databaseId}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', color: 'var(--accent-color, #007aff)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
@@ -305,10 +305,14 @@ export default function ViewSettingsMenu({
                         {f.operator !== 'is_empty' && f.operator !== 'not_empty' && (
                             <input value={f.value} onChange={e => handleUpdateFilter(i, { value: e.target.value })} style={{ ...controlStyle, flex: 1, minWidth: 50 }} placeholder="Value" />
                         )}
-                        <button onClick={() => handleRemoveFilter(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 2, display: 'flex' }}><X size={14} /></button>
+                        {isAdmin && (
+                            <button onClick={() => handleRemoveFilter(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 2, display: 'flex' }}><X size={14} /></button>
+                        )}
                     </div>
                 ))}
-                <button onClick={handleAddFilter} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add filter</button>
+                {isAdmin && (
+                    <button onClick={handleAddFilter} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add filter</button>
+                )}
             </div>
         </div>
     );
@@ -331,10 +335,14 @@ export default function ViewSettingsMenu({
                             <option value="asc">Ascending</option>
                             <option value="desc">Descending</option>
                         </select>
-                        <button onClick={() => handleRemoveSort(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 2, display: 'flex' }}><X size={14} /></button>
+                        {isAdmin && (
+                            <button onClick={() => handleRemoveSort(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 2, display: 'flex' }}><X size={14} /></button>
+                        )}
                     </div>
                 ))}
-                <button onClick={handleAddSort} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add sort</button>
+                {isAdmin && (
+                    <button onClick={handleAddSort} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add sort</button>
+                )}
             </div>
         </div>
     );
@@ -387,9 +395,9 @@ export default function ViewSettingsMenu({
                                 {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280'].map(c => (
                                     <button
                                         key={c}
-                                        onClick={() => handleUpdateColorRule(i, { color: c })}
+                                        onClick={() => isAdmin && handleUpdateColorRule(i, { color: c })}
                                         style={{
-                                            width: 18, height: 18, borderRadius: '50%', background: c, border: r.color === c ? '2px solid var(--text-primary)' : '1px solid rgba(0,0,0,0.1)', cursor: 'pointer'
+                                            width: 18, height: 18, borderRadius: '50%', background: c, border: r.color === c ? '2px solid var(--text-primary)' : '1px solid rgba(0,0,0,0.1)', cursor: r.color === c ? 'default' : (isAdmin ? 'pointer' : 'default')
                                         }}
                                     />
                                 ))}
@@ -397,11 +405,13 @@ export default function ViewSettingsMenu({
                         </div>
                     </div>
                 ))}
-                <button onClick={handleAddColorRule} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add rule</button>
+                {isAdmin && (
+                    <button onClick={handleAddColorRule} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, marginTop: 4, padding: '4px 0' }}><Plus size={14} /> Add rule</button>
+                )}
             </div>
         </div>
     );
-    const isAdmin = currentUser?.role === 'ADMIN';
+    const currentLayout = VIEW_LAYOUTS.find(l => l.id === view.layout) || VIEW_LAYOUTS[0];
 
     // ── Main Panel ────────────────────────────────────────────────────
     return (

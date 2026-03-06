@@ -78,8 +78,8 @@ export default async function DatabasePage({ params }: { params: { id: string } 
     return (
         <div className="page-container fade-in" data-turbo="cache-bust" style={{ maxWidth: '100%', padding: '24px 40px' }}>
             <DatabaseHeader
-                database={database}
-                userRole={user.role}
+                database={database as any}
+                currentUser={user}
                 properties={properties}
                 userOptionsRaw={userOptionsRaw}
             />

@@ -19,9 +19,10 @@ interface MarkdownEditorProps {
     headerContent?: string;
     /** Evaluated footer template string (with placeholders already substituted) */
     footerContent?: string;
+    disabled?: boolean;
 }
 
-export default function MarkdownEditor({ value, onChange, contentTitle, isSaving, headerContent, footerContent }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, onChange, contentTitle, isSaving, headerContent, footerContent, disabled }: MarkdownEditorProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
@@ -279,7 +280,7 @@ export default function MarkdownEditor({ value, onChange, contentTitle, isSaving
                             vertical-align: middle;
                         }
                     `}</style>
-                    <BlockNoteView editor={editor} onChange={handleEditorChange} theme="light" />
+                    <BlockNoteView editor={editor} onChange={handleEditorChange} theme="light" editable={!disabled} />
 
                     {/* ── Ghost Footer for PDF only ── */}
                     {footerContent && (

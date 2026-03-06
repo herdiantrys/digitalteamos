@@ -185,6 +185,18 @@ export default function GalleryView({
                                                             initialValue={customData[p.id]}
                                                             propertyId={p.id}
                                                             colorConfigRaw={colorConfigMap?.[p.id]}
+                                                            disabled={(() => {
+                                                                if (currentUser?.role === 'ADMIN') return false;
+                                                                if (content.authorId === currentUser?.id) return false;
+
+                                                                const customFields = (() => { try { return JSON.parse(content.customFields || '{}'); } catch { return {}; } })();
+                                                                const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+                                                                return !personFields.some(id => {
+                                                                    const val = customFields[id];
+                                                                    if (!val) return false;
+                                                                    return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+                                                                });
+                                                            })()}
                                                         />
                                                     </div>
                                                 </div>

@@ -11,14 +11,16 @@ export async function recordContentHistory(
     contentId: string,
     snapshot: { title: string; caption?: string | null; customFields?: string | null },
     changeDesc: string,
-    changedBy?: string
+    changedBy?: string,
+    changedById?: string
 ) {
     await (prisma as any).contentHistory.create({
         data: {
             contentId,
             snapshot: JSON.stringify(snapshot),
             changeDesc,
-            changedBy: changedBy ?? null
+            changedBy: changedBy ?? null,
+            changedById: changedById ?? null
         }
     });
     // Keep max 50 versions per content — prune oldest
@@ -68,7 +70,8 @@ export async function restoreContentHistory(historyId: string) {
             entry.contentId,
             current,
             `Before restore to version from ${new Date(entry.createdAt).toLocaleString()}`,
-            user.name ?? user.email
+            user.name ?? user.email,
+            user.id
         );
     }
 
@@ -86,9 +89,41 @@ export async function restoreContentHistory(historyId: string) {
         entry.contentId,
         snap,
         `Restored to version from ${new Date(entry.createdAt).toLocaleString()}`,
-        user.name ?? user.email
+        user.name ?? user.email,
+        user.id
     );
 
     revalidatePath('/content');
-    return entry.contentId;
+    return entry.id;
+}
+
+// ── Record a task history snapshot ──────────────────────────────────────────
+export async function recordTaskHistory(
+    taskId: string,
+    snapshot: any,
+    changeDesc: string,
+    changedBy?: string,
+    changedById?: string
+) {
+    await (prisma as any).taskHistory.create({
+        data: {
+            taskId,
+            snapshot: JSON.stringify(snapshot),
+            changeDesc,
+            changedBy: changedBy ?? null,
+            changedById: changedById ?? null
+        }
+    });
+
+    // Prune old history entries
+    const all = await (prisma as any).taskHistory.findMany({
+        where: { taskId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true }
+    });
+
+    if (all.length > 50) {
+        const toDelete = all.slice(50).map((h: any) => h.id);
+        await (prisma as any).taskHistory.deleteMany({ where: { id: { in: toDelete } } });
+    }
 }

@@ -12,12 +12,14 @@ export default function NewTaskModal({
     onClose,
     users,
     relations,
-    defaultStatus
+    defaultStatus,
+    onTaskCreated
 }: {
     onClose: () => void;
     users: User[];
     relations: Relation[];
     defaultStatus: string;
+    onTaskCreated?: (task: any) => void;
 }) {
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
@@ -29,7 +31,14 @@ export default function NewTaskModal({
 
         startTransition(async () => {
             try {
-                await createTask(formData);
+                const newTask = await createTask(formData);
+                if (onTaskCreated) {
+                    // Resolve assignee object for UI
+                    const assignee = newTask.assigneeId
+                        ? users.find(u => u.id === newTask.assigneeId) || null
+                        : null;
+                    onTaskCreated({ ...newTask, assignee });
+                }
                 onClose();
             } catch (err: any) {
                 alert(err.message);

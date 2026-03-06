@@ -304,6 +304,25 @@ export default function TimelineView({
     useEffect(() => {
         if (!resizingItemId || !resizingSide || !datePropId) return;
 
+        const getDateAtPoint = (x: number) => {
+            const rect = gridRef.current?.getBoundingClientRect();
+            if (!rect) return null;
+            const offset = Math.floor((x - rect.left) / colW);
+            return addDays(startDate, offset);
+        };
+
+        const canEditItem = (item: any) => {
+            if (currentUser?.role === 'ADMIN') return true;
+            if (item.authorId === currentUser?.id) return true;
+
+            const customFields = (() => { try { return JSON.parse(item.customFields || '{}'); } catch { return {}; } })();
+            const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+            return personFields.some(id => {
+                const val = customFields[id];
+                if (!val) return false;
+                return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+            });
+        };
         const handleMouseMove = (e: MouseEvent) => {
             if (!gridRef.current) return;
             const rect = gridRef.current.getBoundingClientRect();
@@ -363,7 +382,7 @@ export default function TimelineView({
             window.removeEventListener('mouseup', handleMouseUp);
             document.body.style.cursor = '';
         };
-    }, [resizingItemId, resizingSide, colW, startDate, datePropId, localContents, contents]);
+    }, [resizingItemId, resizingSide, colW, startDate, datePropId, localContents, contents, currentUser, properties]);
 
     const handleGridDrop = async (e: React.DragEvent) => {
         e.preventDefault();
@@ -427,6 +446,19 @@ export default function TimelineView({
     const HEADER_HEIGHT = 68; // 40 + 28
     const ROW_HEIGHT = 48;
     const GROUP_HEIGHT = 38;
+
+    const canEditItem = (item: any) => {
+        if (currentUser?.role === 'ADMIN') return true;
+        if (item.authorId === currentUser?.id) return true;
+
+        const customFields = (() => { try { return JSON.parse(item.customFields || '{}'); } catch { return {}; } })();
+        const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+        return personFields.some(id => {
+            const val = customFields[id];
+            if (!val) return false;
+            return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+        });
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid var(--border-color)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-color)' }}>
@@ -609,9 +641,9 @@ export default function TimelineView({
                                             >
                                                 {hasBar && (
                                                     <div
-                                                        draggable={!resizingItemId && !resizingSide}
+                                                        draggable={!resizingItemId && !resizingSide && canEditItem(content)}
                                                         onDragStart={(e) => {
-                                                            if (resizingItemId || resizingSide) {
+                                                            if (resizingItemId || resizingSide || !canEditItem(content)) {
                                                                 e.preventDefault();
                                                                 return;
                                                             }
@@ -649,11 +681,12 @@ export default function TimelineView({
                                                                 onMouseDown={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
+                                                                    if (!canEditItem(content)) return;
                                                                     setResizingItemId(content.id);
                                                                     setResizingSide('left');
                                                                     document.body.style.cursor = 'col-resize';
                                                                 }}
-                                                                style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10, background: 'rgba(255,255,255,0.1)' }}
+                                                                style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: canEditItem(content) ? 'col-resize' : 'default', zIndex: 10, background: 'rgba(255,255,255,0.1)' }}
                                                             />
                                                         )}
 
@@ -667,11 +700,12 @@ export default function TimelineView({
                                                                 onMouseDown={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
+                                                                    if (!canEditItem(content)) return;
                                                                     setResizingItemId(content.id);
                                                                     setResizingSide('right');
                                                                     document.body.style.cursor = 'col-resize';
                                                                 }}
-                                                                style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10, background: 'rgba(255,255,255,0.1)' }}
+                                                                style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: canEditItem(content) ? 'col-resize' : 'default', zIndex: 10, background: 'rgba(255,255,255,0.1)' }}
                                                             />
                                                         )}
                                                     </div>

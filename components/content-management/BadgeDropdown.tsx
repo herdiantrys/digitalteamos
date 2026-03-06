@@ -15,7 +15,8 @@ export default function BadgeDropdown({
     multiple = true,
     placeholder = "Select...",
     propertyId,
-    colorConfigRaw
+    colorConfigRaw,
+    disabled = false
 }: {
     optionsRaw: string | null;
     name?: string;
@@ -25,6 +26,7 @@ export default function BadgeDropdown({
     placeholder?: string;
     propertyId?: string;
     colorConfigRaw?: string | null;
+    disabled?: boolean;
 }) {
     const router = useRouter();
     const [selected, setSelected] = useState<string[]>(initialValues);
@@ -112,6 +114,7 @@ export default function BadgeDropdown({
     }, [isOpen]);
 
     const handleOpen = () => {
+        if (disabled) return;
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             setDropdownStyles({
@@ -125,6 +128,7 @@ export default function BadgeDropdown({
     };
 
     const toggleOption = (opt: string) => {
+        if (disabled) return;
         let newSel: string[];
         if (multiple) {
             newSel = [...selected];
@@ -165,7 +169,7 @@ export default function BadgeDropdown({
                     border: '1px solid transparent',
                     borderRadius: 6,
                     background: isOpen ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    cursor: isOpen ? 'default' : 'pointer',
+                    cursor: disabled ? 'not-allowed' : isOpen ? 'default' : 'pointer',
                     display: 'flex',
                     flexWrap: 'nowrap', // Prevent wrapping to keep row height consistent
                     overflowX: 'auto', // Allow scrolling if many tags
@@ -210,7 +214,7 @@ export default function BadgeDropdown({
                                     optionObj && <div style={{ width: 22, height: 22, borderRadius: '50%', background: colorObj.text, color: colorObj.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9 }}>{label.charAt(0)}</div>
                                 )}
                                 {label}
-                                {multiple && (
+                                {multiple && !disabled && (
                                     <span
                                         onClick={(e) => { e.stopPropagation(); toggleOption(sel); }}
                                         style={{ cursor: 'pointer', opacity: 0.7, fontSize: 12, display: 'flex', transition: 'opacity 0.1s', marginLeft: 2 }}

@@ -10,11 +10,13 @@ import MarkdownEditor from './MarkdownEditor';
 export default function CreateContentModal({
     properties,
     userOptionsRaw,
-    databaseId
+    databaseId,
+    currentUser
 }: {
     properties: any[];
     userOptionsRaw: string;
     databaseId?: string;
+    currentUser?: any;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -210,6 +212,8 @@ export default function CreateContentModal({
                                                             optionsRaw={userOptionsRaw}
                                                             name={`prop_${prop.id}`}
                                                             multiple={false}
+                                                            initialValues={currentUser?.role === 'STAFF' ? [currentUser.id] : (prefillData[`prop_${prop.id}`] ? [prefillData[`prop_${prop.id}`]] : [])}
+                                                            disabled={currentUser?.role === 'STAFF'}
                                                             placeholder="-- Select Member --"
                                                             propertyId={prop.id}
                                                             colorConfigRaw={(prop as any).colorConfig}

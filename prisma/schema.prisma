@@ -24,6 +24,9 @@ model User {
   contents      Content[] @relation("ContentAuthor")
   assignedTasks Task[]    @relation("TaskAssignee")
   createdTasks  Task[]    @relation("TaskCreator")
+  
+  contentHistory ContentHistory[] @relation("HistoryChanger")
+  taskHistory    TaskHistory[]    @relation("TaskHistoryChanger")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -128,6 +131,8 @@ model ContentHistory {
   content    Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
   snapshot   String // Full JSON snapshot: { title, caption, customFields }
   changedBy  String? // User name at time of change
+  changedById String?
+  changedByUser User? @relation("HistoryChanger", fields: [changedById], references: [id], onDelete: SetNull)
   changeDesc String? // Human-readable description e.g. "Updated Status → Published"
   createdAt  DateTime @default(now())
 }
@@ -159,6 +164,7 @@ model Task {
   description String?
   status      String    @default("TODO") // "TODO", "IN_PROGRESS", "DONE"
   priority    String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  startDate   DateTime? 
   dueDate     DateTime?
 
   // Who the task is assigned to
@@ -176,6 +182,22 @@ model Task {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   content       String?   // Rich text content (markdown)
+  
+  history TaskHistory[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model TaskHistory {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  snapshot   String // Full JSON snapshot: { title, status, priority, assigneeId, description, etc }
+  changedBy  String? // User name at time of change
+  changedById String?
+  changedByUser User? @relation("TaskHistoryChanger", fields: [changedById], references: [id], onDelete: SetNull)
+  changeDesc String? // Human-readable description
+  createdAt  DateTime @default(now())
+}
+

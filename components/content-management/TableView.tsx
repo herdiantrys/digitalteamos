@@ -873,6 +873,19 @@ export default function TableView({
                                                                 initialValue={customData[p.id]}
                                                                 propertyId={p.id}
                                                                 colorConfigRaw={(p as any).colorConfig}
+                                                                disabled={(() => {
+                                                                    if (currentUser?.role === 'ADMIN') return false;
+                                                                    if (content.authorId === currentUser?.id) return false;
+
+                                                                    // Check if user is linked in any PERSON property
+                                                                    const customFields = (() => { try { return JSON.parse(content.customFields || '{}'); } catch { return {}; } })();
+                                                                    const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+                                                                    return !personFields.some(id => {
+                                                                        const val = customFields[id];
+                                                                        if (!val) return false;
+                                                                        return String(val).split(',').map(s => s.trim()).includes(currentUser?.id);
+                                                                    });
+                                                                })()}
                                                             />
                                                             {isActive && (
                                                                 <div

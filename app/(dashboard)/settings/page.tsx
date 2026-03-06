@@ -3,6 +3,7 @@ import { requireAuth } from '../../../lib/auth';
 import { createUser, updateUserStatus, deleteUser } from '../../../lib/admin-actions';
 import { UserRow } from './SettingsClient';
 import WorkspaceSettingsClient from './WorkspaceSettingsClient';
+import WorkspaceMembersPanel from './WorkspaceMembersPanel';
 
 const prisma = new PrismaClient();
 
@@ -16,14 +17,35 @@ export default async function SettingsPage() {
 
     if (!currentUser.activeWorkspaceId) throw new Error('No active workspace');
 
-
-
     const adminWorkspaces = isAdmin ? await prisma.workspace.findMany({
         where: {
             members: { some: { userId: currentUser.id } }
         },
         orderBy: { createdAt: 'asc' }
     }) : [];
+
+    // For workspace access management: get all staff users with their workspace memberships
+    const staffUsers = isAdmin ? await prisma.user.findMany({
+        where: { role: 'STAFF' },
+        orderBy: { name: 'asc' },
+        include: {
+            workspaceMembers: {
+                where: {
+                    workspaceId: { in: adminWorkspaces.map(w => w.id) }
+                },
+                select: { workspaceId: true }
+            }
+        }
+    }) : [];
+
+    const staffUsersForPanel = staffUsers.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        photo: u.photo,
+        workspaceIds: u.workspaceMembers.map(m => m.workspaceId)
+    }));
 
     return (
         <div className="page-container fade-in" style={{ maxWidth: '100%', padding: '24px 40px' }}>
@@ -88,7 +110,25 @@ export default async function SettingsPage() {
 
             {isAdmin && (
                 <>
-                    <h2 className="page-title" style={{ marginTop: 48, fontSize: 20 }}>Workspaces</h2>
+                    {/* Staff Workspace Access Management */}
+                    <h2 className="page-title" style={{ marginTop: 48, fontSize: 20 }}>Staff Workspace Access</h2>
+                    <div className="glass-card" style={{ marginBottom: 48 }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 13 }}>
+                            Control which workspaces each staff member can access. A single staff member can be assigned to multiple workspaces.
+                        </p>
+                        {staffUsersForPanel.length === 0 ? (
+                            <p style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: 32 }}>
+                                No staff members found. Create staff accounts above to manage their workspace access here.
+                            </p>
+                        ) : (
+                            <WorkspaceMembersPanel
+                                users={staffUsersForPanel}
+                                allWorkspaces={adminWorkspaces.map(w => ({ id: w.id, name: w.name }))}
+                            />
+                        )}
+                    </div>
+
+                    <h2 className="page-title" style={{ marginTop: 0, fontSize: 20 }}>Workspaces</h2>
                     <div className="glass-card" style={{ marginBottom: 48 }}>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 13 }}>
                             Manage the workspaces you are part of. Deleting a workspace will automatically migrate users to another workspace if available.
@@ -98,8 +138,6 @@ export default async function SettingsPage() {
                             activeWorkspaceId={currentUser.activeWorkspaceId as string}
                         />
                     </div>
-
-
                 </>
             )}
 

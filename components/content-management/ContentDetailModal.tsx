@@ -34,6 +34,7 @@ interface ContentDetailModalProps {
     properties: any[];
     userOptionsRaw: string;
     database?: any;
+    currentUser: { id: string, role: string };
 }
 
 export default function ContentDetailModal({
@@ -43,6 +44,7 @@ export default function ContentDetailModal({
     properties,
     userOptionsRaw,
     database,
+    currentUser,
 }: ContentDetailModalProps) {
     const [content, setContent] = useState(initialContent);
     const [isSaving, startTransition] = useTransition();
@@ -68,7 +70,18 @@ export default function ContentDetailModal({
 
     if ((!isOpen && !isVisible) || !content) return null;
 
+    const customFields = (() => { try { return JSON.parse(content?.customFields || '{}'); } catch { return {}; } })();
+    const personFields = properties.filter(p => p.type === 'PERSON').map(p => p.id);
+    const isAssigned = personFields.some(id => {
+        const val = customFields[id];
+        if (!val) return false;
+        return String(val).split(',').map(s => s.trim()).includes(currentUser.id);
+    });
+
+    const canEdit = currentUser.role === 'ADMIN' || content.authorId === currentUser.id || isAssigned;
+
     const handleMainChange = (key: string, val: string) => {
+        if (!canEdit) return;
         setContent((prev: any) => ({ ...prev, [key]: val }));
 
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -82,7 +95,7 @@ export default function ContentDetailModal({
         }, 800);
     };
 
-    const customFields = (() => { try { return JSON.parse(content?.customFields || '{}'); } catch { return {}; } })();
+
 
     const parseTemplate = (tmpl?: string) => {
         if (!tmpl) return '';
@@ -222,10 +235,12 @@ export default function ContentDetailModal({
                             value={content?.title || ''}
                             onChange={(e) => handleMainChange('title', e.target.value)}
                             placeholder="Untitled"
+                            disabled={!canEdit}
                             style={{
                                 width: '100%', border: 'none', background: 'transparent',
                                 fontSize: 36, fontWeight: 800, color: 'var(--text-primary)',
-                                outline: 'none', marginBottom: 24, letterSpacing: '-0.03em'
+                                outline: 'none', marginBottom: 24, letterSpacing: '-0.03em',
+                                opacity: canEdit ? 1 : 0.8
                             }}
                         />
 
@@ -264,6 +279,7 @@ export default function ContentDetailModal({
                                                 initialValue={customFields[prop.id]}
                                                 propertyId={prop.id}
                                                 colorConfigRaw={(prop as any).colorConfig}
+                                                disabled={!canEdit}
                                             />
                                         </div>
                                     </div>
@@ -281,6 +297,7 @@ export default function ContentDetailModal({
                                 isSaving={isSaving}
                                 headerContent={evaluatedHeader || undefined}
                                 footerContent={evaluatedFooter || undefined}
+                                disabled={!canEdit}
                             />
                         </div>
                     </div>

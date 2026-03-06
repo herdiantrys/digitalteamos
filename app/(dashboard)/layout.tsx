@@ -84,6 +84,29 @@ export default async function DashboardLayout({
         })
         : [];
 
+    // Fetch unfinished task count for the current user
+    const unfinishedTaskCount = user.activeWorkspaceId
+        ? await prisma.task.count({
+            where: {
+                workspaceId: user.activeWorkspaceId,
+                assigneeId: user.id,
+                status: { not: 'DONE' }
+            }
+        })
+        : 0;
+
+    // Check if user has at least one task and none are unfinished
+    const totalTaskCount = user.activeWorkspaceId
+        ? await prisma.task.count({
+            where: {
+                workspaceId: user.activeWorkspaceId,
+                assigneeId: user.id
+            }
+        })
+        : 0;
+
+    const isAllTasksDone = totalTaskCount > 0 && unfinishedTaskCount === 0;
+
     return (
         <div className="app-container">
             <Sidebar
@@ -92,6 +115,8 @@ export default async function DashboardLayout({
                 workspaces={workspaces}
                 activeWorkspaceId={user.activeWorkspaceId}
                 databases={databases}
+                unfinishedTaskCount={unfinishedTaskCount}
+                isAllTasksDone={isAllTasksDone}
             />
             <main className="main-content">
                 <Topbar userName={user.name} userPhoto={user.photo} />

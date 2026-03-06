@@ -85,3 +85,52 @@ export async function updateUser(formData: FormData) {
 
     revalidatePath('/settings');
 }
+
+export async function addUserToWorkspace(userId: string, workspaceId: string) {
+    await requireAdmin();
+
+    await prisma.workspaceMember.upsert({
+        where: { workspaceId_userId: { workspaceId, userId } },
+        create: { workspaceId, userId, role: 'MEMBER' },
+        update: {}
+    });
+
+    revalidatePath('/settings');
+}
+
+export async function removeUserFromWorkspace(userId: string, workspaceId: string) {
+    await requireAdmin();
+
+    // Ensure the user is not the only member in this workspace
+    const memberCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+    if (memberCount <= 1) throw new Error('Cannot remove the last member from a workspace.');
+
+    await prisma.workspaceMember.delete({
+        where: { workspaceId_userId: { workspaceId, userId } }
+    }).catch(() => { /* ignore if not member */ });
+
+    // If this was the user's active workspace, switch to another
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { activeWorkspaceId: true } });
+    if (user?.activeWorkspaceId === workspaceId) {
+        const newMembership = await prisma.workspaceMember.findFirst({
+            where: { userId, workspaceId: { not: workspaceId } }
+        });
+        await prisma.user.update({
+            where: { id: userId },
+            data: { activeWorkspaceId: newMembership?.workspaceId ?? null }
+        });
+    }
+
+    revalidatePath('/settings');
+}
+
+export async function getUserWorkspaceAccess(userId: string) {
+    await requireAdmin();
+
+    const memberships = await prisma.workspaceMember.findMany({
+        where: { userId },
+        include: { workspace: { select: { id: true, name: true } } }
+    });
+
+    return memberships.map(m => m.workspace);
+}
