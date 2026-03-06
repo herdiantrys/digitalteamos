@@ -4,27 +4,33 @@ import Link from 'next/link';
 
 const prisma = new PrismaClient();
 
+import { redirect } from 'next/navigation';
+
 export default async function DashboardPage() {
     const user = await requireAuth();
+    const anyUser = user as any;
+
+    // If still no workspace after layout provisioning, redirect to trigger a
+    // fresh request cycle so the provisioning in layout.tsx can complete.
+    if (!anyUser.activeWorkspaceId) redirect('/dashboard');
+    const workspaceId: string = anyUser.activeWorkspaceId;
 
     // Fetch Aggregated Metrics
-    const totalUsers = await prisma.user.count();
-
-    // Project Metrics
-    const projectStats = await prisma.project.groupBy({
-        by: ['status'],
-        _count: { id: true }
+    const totalUsers = await prisma.workspaceMember.count({
+        where: { workspaceId }
     });
-    const totalProjects = projectStats.reduce((acc, curr) => acc + curr._count.id, 0);
-    const completedProjects = projectStats.find(s => s.status === 'COMPLETED')?._count.id || 0;
+
+    // Content Metrics
 
 
     // Content Metrics
-    const totalContent = await prisma.content.count();
+    const totalContent = await prisma.content.count({
+        where: { workspaceId }
+    });
 
     // Fetch Recent Activity (Limit to 5)
-
     const recentContentRaw = await prisma.content.findMany({
+        where: { workspaceId },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: { author: { select: { id: true, name: true } } }
@@ -55,14 +61,6 @@ export default async function DashboardPage() {
                 />
 
 
-                <MetricCard
-                    title="Projects"
-                    value={totalProjects}
-                    subtitle={`${completedProjects} Completed`}
-                    icon="▣"
-                    link="/projects"
-                    color="hsl(280, 70%, 60%)"
-                />
 
                 <MetricCard
                     title="Team Members"

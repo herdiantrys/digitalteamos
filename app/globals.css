@@ -44,6 +44,25 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Premium Scrollbar */
+.premium-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.premium-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.premium-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.premium-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+  opacity: 0.5;
+}
+
 /* App Layout */
 .app-container {
   display: flex;
@@ -270,6 +289,155 @@ body {
   background: rgba(255, 77, 79, 0.1);
   border-color: rgba(255, 77, 79, 0.3);
   color: #ff4d4f;
+}
+
+/* Enhanced Topbar Styles */
+.topbar-search-container {
+  display: flex;
+  align-items: center;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 4px 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 200px;
+  position: relative;
+}
+
+.topbar-search-container:focus-within {
+  width: 280px;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(46, 170, 220, 0.15);
+  background: var(--bg-color);
+}
+
+.topbar-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+  padding: 4px 8px;
+}
+
+.topbar-search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* Topbar Popovers (Notifications & Profile) */
+.topbar-popover-anchor {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.topbar-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 280px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  overflow: hidden;
+  animation: popoverDrop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+
+@keyframes popoverDrop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.topbar-popover-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.topbar-popover-item {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.topbar-popover-item:hover {
+  background: var(--sidebar-bg);
+}
+
+.topbar-popover-item.danger {
+  color: #ff4d4f;
+}
+
+.topbar-popover-item.danger:hover {
+  background: rgba(255, 77, 79, 0.08);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ff4d4f;
+  color: white;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--glass-bg);
+  padding: 0 4px;
+}
+
+/* User Avatar Tiny */
+.avatar-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.avatar-sm:hover,
+.avatar-sm.active {
+  border-color: var(--accent-color);
 }
 
 .page-container {

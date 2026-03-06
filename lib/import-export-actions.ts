@@ -12,13 +12,16 @@ const prisma = new PrismaClient();
 export async function exportContentCSV(): Promise<string> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can export data.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
     const contents = await prisma.content.findMany({
+        where: { workspaceId: user.activeWorkspaceId },
         include: { author: true },
         orderBy: { createdAt: 'desc' }
     });
 
     const properties = await prisma.propertyDefinition.findMany({
+        where: { workspaceId: user.activeWorkspaceId },
         orderBy: { order: 'asc' }
     });
 
@@ -50,13 +53,16 @@ export async function exportContentCSV(): Promise<string> {
 export async function exportContentMarkdown(): Promise<string> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can export data.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
     const contents = await prisma.content.findMany({
+        where: { workspaceId: user.activeWorkspaceId },
         include: { author: true },
         orderBy: { createdAt: 'desc' }
     });
 
     const properties = await prisma.propertyDefinition.findMany({
+        where: { workspaceId: user.activeWorkspaceId },
         orderBy: { order: 'asc' }
     });
 
@@ -138,7 +144,8 @@ async function ensurePropertiesExist(
     headers: string[],
     propByName: Map<string, any>,
     allRows?: Record<string, string>[],   // optional: used to collect SELECT options
-    updateExistingOptions = false          // also update options for existing empty-option props
+    updateExistingOptions = false,         // also update options for existing empty-option props
+    workspaceId?: string                   // scoped to workspace
 ): Promise<{ propByName: Map<string, any>; created: string[] }> {
     const created: string[] = [];
     let maxOrder = 0;
@@ -173,6 +180,7 @@ async function ensurePropertiesExist(
                     name: displayName,
                     type,
                     order: maxOrder,
+                    workspaceId: workspaceId || undefined,
                     ...(optionsJson ? { options: optionsJson } : {})
                 }
             });
@@ -209,8 +217,9 @@ async function ensurePropertiesExist(
 export async function importContentCSV(csvText: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can import data.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
-    const existingProps = await prisma.propertyDefinition.findMany();
+    const existingProps = await prisma.propertyDefinition.findMany({ where: { workspaceId: user.activeWorkspaceId } });
     const propByName = new Map<string, any>(existingProps.map((p: any) => [p.name.toLowerCase().trim(), p]));
 
     // 1. Strip UTF-8 BOM (Excel adds this)
@@ -254,7 +263,7 @@ export async function importContentCSV(csvText: string): Promise<{ imported: num
     const headers = rawHeaders.map(h => h.replace(/^\uFEFF/, '').replace(/^"|"$/g, '').toLowerCase().trim());
 
     // 5. Auto-create missing properties
-    const { propByName: updatedProps, created } = await ensurePropertiesExist(headers, propByName as Map<string, any>);
+    const { propByName: updatedProps, created } = await ensurePropertiesExist(headers, propByName as Map<string, any>, undefined, false, user.activeWorkspaceId);
 
     const errors: string[] = [];
     errors.push(`[DEBUG] ${lines.length - 1} data rows | Delimiter: "${delimiter === '\t' ? 'TAB' : delimiter}" | Headers: [${headers.join(', ')}]`);
@@ -295,7 +304,8 @@ export async function importContentCSV(csvText: string): Promise<{ imported: num
                     caption: caption || null,
                     mediaUrl: mediaUrl || null,
                     customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
-                    authorId: user.id
+                    authorId: user.id,
+                    workspaceId: user.activeWorkspaceId
                 }
             });
 
@@ -383,8 +393,9 @@ function parseCsvLines(csvText: string): { headers: string[]; rows: Record<strin
 export async function analyzeImportCSV(csvText: string): Promise<AnalyzeResult> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can perform import analysis.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
-    const existingProps = await prisma.propertyDefinition.findMany({ orderBy: { name: 'asc' } });
+    const existingProps = await prisma.propertyDefinition.findMany({ where: { workspaceId: user.activeWorkspaceId }, orderBy: { name: 'asc' } });
     const propMap = new Map<string, any>();
     for (const p of existingProps as any[]) {
         propMap.set(p.name.toLowerCase().trim(), p);
@@ -417,7 +428,7 @@ export async function analyzeImportCSV(csvText: string): Promise<AnalyzeResult> 
     });
 
     // Find conflicts
-    const existingTitles = await prisma.content.findMany({ select: { id: true, title: true } });
+    const existingTitles = await prisma.content.findMany({ where: { workspaceId: user.activeWorkspaceId }, select: { id: true, title: true } });
     const titleMap = new Map(existingTitles.map((c: any) => [c.title.toLowerCase().trim(), c.id]));
 
     const analyzedRows: AnalyzedRow[] = rows.map((row, idx) => {
@@ -466,8 +477,9 @@ export interface ImportOptions {
 export async function executeImportCSV(opts: ImportOptions): Promise<{ imported: number; replaced: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can execute data import.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
-    const existingProps = await prisma.propertyDefinition.findMany();
+    const existingProps = await prisma.propertyDefinition.findMany({ where: { workspaceId: user.activeWorkspaceId } });
     const { headers, rows } = parseCsvLines(opts.csvText);
 
     // ── Build a mapping map from front-end options ────────────────────────────
@@ -492,7 +504,7 @@ export async function executeImportCSV(opts: ImportOptions): Promise<{ imported:
     // Step 2: Ensure all headers have a corresponding property definition
     // (If mapping says existingPropId, we use that. Otherwise we ensure/create)
     const { propByName: updatedProps } = await ensurePropertiesExist(
-        headersToEnsure, propMap, rows, true
+        headersToEnsure, propMap, rows, true, user.activeWorkspaceId
     );
 
     // Final consolidated mapping for row-by-row processing
@@ -514,7 +526,7 @@ export async function executeImportCSV(opts: ImportOptions): Promise<{ imported:
 
     // ── Fetch existing content titles and users for matching ─────────────────
     const [existingTitles, allUsers] = await Promise.all([
-        prisma.content.findMany({ select: { id: true, title: true } }),
+        prisma.content.findMany({ where: { workspaceId: user.activeWorkspaceId }, select: { id: true, title: true } }),
         prisma.user.findMany({ select: { id: true, name: true, email: true } }) as Promise<{ id: string; name: string | null; email: string }[]>
     ]);
     const titleMap = new Map<string, string>(existingTitles.map((c: any) => [c.title.toLowerCase().trim(), c.id]));
@@ -578,7 +590,8 @@ export async function executeImportCSV(opts: ImportOptions): Promise<{ imported:
                     data: {
                         title, caption, mediaUrl,
                         customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
-                        authorId: user.id
+                        authorId: user.id,
+                        workspaceId: user.activeWorkspaceId
                     }
                 });
                 imported++;
@@ -604,8 +617,9 @@ export async function executeImportCSV(opts: ImportOptions): Promise<{ imported:
 export async function importContentMarkdown(mdText: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
     const user = await requireAuth();
     if (user.role !== 'ADMIN') throw new Error('Only admins can import data.');
+    if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
-    const properties = await prisma.propertyDefinition.findMany();
+    const properties = await prisma.propertyDefinition.findMany({ where: { workspaceId: user.activeWorkspaceId } });
     // Build a flexible header → prop map (same strategy as CSV)
     const slugifyLocal = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const propMap = new Map<string, any>();
@@ -667,7 +681,8 @@ export async function importContentMarkdown(mdText: string): Promise<{ imported:
                     caption: caption || null,
                     mediaUrl: mediaUrl || null,
                     customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
-                    authorId: user.id
+                    authorId: user.id,
+                    workspaceId: user.activeWorkspaceId
                 }
             });
 

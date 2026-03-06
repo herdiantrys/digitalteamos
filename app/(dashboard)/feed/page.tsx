@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // Define a common interface for the feed items
 interface FeedItem {
     id: string;
-    type: 'content' | 'task' | 'project';
+    type: 'content' | 'task';
     action: 'created' | 'updated';
     title: string;
     user: string;
@@ -27,12 +27,6 @@ export default async function FeedPage() {
         include: { author: { select: { name: true } } }
     });
 
-
-    // Fetch the 50 most recently updated projects
-    const projects = await prisma.project.findMany({
-        orderBy: { updatedAt: 'desc' },
-        take: 50,
-    });
 
     // Normalize and aggregate into a single array
     const feedItems: FeedItem[] = [];
@@ -53,19 +47,6 @@ export default async function FeedPage() {
     });
 
 
-    projects.forEach(p => {
-        const isNew = Math.abs(p.updatedAt.getTime() - p.createdAt.getTime()) < 5000;
-        feedItems.push({
-            id: `project-${p.id}`,
-            type: 'project',
-            action: isNew ? 'created' : 'updated',
-            title: p.name,
-            user: 'System', // Projects don't have an owner in the current schema
-            date: p.updatedAt,
-            link: '/projects',
-            icon: <FolderOpen size={20} />
-        });
-    });
 
     // Sort all items globally by date descending
     feedItems.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -84,7 +65,7 @@ export default async function FeedPage() {
                             <Inbox size={48} color="var(--text-secondary)" />
                         </div>
                         <h3 style={{ marginBottom: 8 }}>No activity yet</h3>
-                        <p>When content or projects are created or updated, they will appear here.</p>
+                        <p>When content is created or updated, it will appear here.</p>
                     </div>
                 ) : (
                     topFeedItems.map(item => (

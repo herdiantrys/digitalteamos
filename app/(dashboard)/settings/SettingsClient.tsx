@@ -2,8 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { updateUser } from '../../../lib/admin-actions';
-import { reorderProperties } from '../../../lib/property-actions';
-import EditablePropertyRow from './EditablePropertyRow';
 
 // ─────────────────────────────────────────────
 // User Edit Modal — Premium Two-Panel Design
@@ -216,115 +214,6 @@ function EditUserModal({ user, onClose }: { user: any; onClose: () => void }) {
         </div>
     );
 }
-// ─────────────────────────────────────────────
-// Draggable Properties List
-// ─────────────────────────────────────────────
-function DraggablePropertyList({ initialProperties }: { initialProperties: any[] }) {
-    const [properties, setProperties] = useState(initialProperties);
-    const [draggedId, setDraggedId] = useState<string | null>(null);
-    const [dragOverId, setDragOverId] = useState<string | null>(null);
-    const [isSavingOrder, setIsSavingOrder] = useState(false);
-
-    const handleDragStart = (id: string) => {
-        setDraggedId(id);
-    };
-
-    const handleDragOver = (e: React.DragEvent, id: string) => {
-        e.preventDefault();
-        if (id !== draggedId) setDragOverId(id);
-    };
-
-    const handleDrop = async (e: React.DragEvent, targetId: string) => {
-        e.preventDefault();
-        if (!draggedId || draggedId === targetId) {
-            setDraggedId(null);
-            setDragOverId(null);
-            return;
-        }
-
-        const dragged = properties.find(p => p.id === draggedId)!;
-        const targetIndex = properties.findIndex(p => p.id === targetId);
-
-        const newOrder = properties.filter(p => p.id !== draggedId);
-        newOrder.splice(targetIndex, 0, dragged);
-
-        setProperties(newOrder);
-        setDraggedId(null);
-        setDragOverId(null);
-
-        // Persist the new order
-        setIsSavingOrder(true);
-        try {
-            await reorderProperties(newOrder.map(p => p.id));
-        } finally {
-            setIsSavingOrder(false);
-        }
-    };
-
-    const handleDragEnd = () => {
-        setDraggedId(null);
-        setDragOverId(null);
-    };
-
-    return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ fontWeight: 600 }}>Active Properties</h3>
-                {isSavingOrder && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Saving order...</span>}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {properties.map(p => {
-                    const isDragging = draggedId === p.id;
-                    const isOver = dragOverId === p.id;
-                    return (
-                        <div
-                            key={p.id}
-                            draggable
-                            onDragStart={() => handleDragStart(p.id)}
-                            onDragOver={e => handleDragOver(e, p.id)}
-                            onDrop={e => handleDrop(e, p.id)}
-                            onDragEnd={handleDragEnd}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                opacity: isDragging ? 0.35 : 1,
-                                transform: isDragging ? 'scale(0.98)' : 'scale(1)',
-                                transition: 'opacity 0.15s, transform 0.15s',
-                                boxShadow: isOver ? '0 0 0 2px rgba(0,120,255,0.5)' : 'none',
-                                borderRadius: 8,
-                            }}
-                        >
-                            {/* Drag Handle */}
-                            <div
-                                style={{
-                                    cursor: 'grab',
-                                    color: 'var(--text-secondary)',
-                                    fontSize: 16,
-                                    padding: '0 4px',
-                                    userSelect: 'none',
-                                    flexShrink: 0
-                                }}
-                                title="Drag to reorder"
-                            >
-                                ⠿
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <EditablePropertyRow property={p} />
-                            </div>
-                        </div>
-                    );
-                })}
-                {properties.length === 0 && (
-                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, border: '1px dashed var(--border-color)', borderRadius: 8 }}>
-                        No custom properties defined yet.
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
 
 // ─────────────────────────────────────────────
 // User Row with Edit Button
@@ -379,12 +268,7 @@ export function UserRow({ user, currentUserId, banAction, deleteAction }: {
 }
 
 
-// ─────────────────────────────────────────────
-// Default export: Settings Client wrapper
-// ─────────────────────────────────────────────
-export default function SettingsClient({ properties }: { properties: any[] }) {
-    return <DraggablePropertyList initialProperties={properties} />;
-}
+
 
 // Shared styles
 const inputStyle: React.CSSProperties = {

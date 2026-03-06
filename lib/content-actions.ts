@@ -48,17 +48,23 @@ export async function createContent(formData: FormData) {
             }
         }
     }
+    const databaseId = formData.get('databaseId') as string | null;
 
     await prisma.content.create({
         data: {
             title,
             caption,
             customFields: Object.keys(customFields).length > 0 ? JSON.stringify(customFields) : null,
-            authorId: user.id
+            authorId: user.id,
+            workspaceId: user.activeWorkspaceId,
+            databaseId: databaseId || null
         }
     });
 
     revalidatePath('/content');
+    if (databaseId) {
+        revalidatePath(`/databases/${databaseId}`);
+    }
 }
 
 export async function updateContentField(contentId: string, customFieldsJson: string) {

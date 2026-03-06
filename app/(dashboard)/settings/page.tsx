@@ -1,8 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../../../lib/auth';
 import { createUser, updateUserStatus, deleteUser } from '../../../lib/admin-actions';
-import { createPropertyDefinition } from '../../../lib/property-actions';
-import SettingsClient, { UserRow } from './SettingsClient';
+import { UserRow } from './SettingsClient';
+import WorkspaceSettingsClient from './WorkspaceSettingsClient';
 
 const prisma = new PrismaClient();
 
@@ -14,9 +14,16 @@ export default async function SettingsPage() {
         orderBy: { createdAt: 'asc' }
     });
 
-    const properties = await prisma.propertyDefinition.findMany({
-        orderBy: { order: 'asc' }
-    });
+    if (!currentUser.activeWorkspaceId) throw new Error('No active workspace');
+
+
+
+    const adminWorkspaces = isAdmin ? await prisma.workspace.findMany({
+        where: {
+            members: { some: { userId: currentUser.id } }
+        },
+        orderBy: { createdAt: 'asc' }
+    }) : [];
 
     return (
         <div className="page-container fade-in" style={{ maxWidth: '100%', padding: '24px 40px' }}>
@@ -81,36 +88,18 @@ export default async function SettingsPage() {
 
             {isAdmin && (
                 <>
-                    <h2 className="page-title" style={{ marginTop: 48, fontSize: 20 }}>Content Schema Editor</h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: 32 }}>
-                        {/* Add Property Form */}
-                        <div className="glass-card" style={{ height: 'fit-content' }}>
-                            <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Add Content Property</h3>
-                            <form action={createPropertyDefinition} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <input name="name" placeholder="Property Name (e.g., Campaign, Priority)" required style={inputStyle} />
-                                <select name="type" required style={inputStyle}>
-                                    <option value="TEXT">Text</option>
-                                    <option value="NUMBER">Number</option>
-                                    <option value="SELECT">Select</option>
-                                    <option value="MULTI_SELECT">Multi-select</option>
-                                    <option value="DATE">Date</option>
-                                    <option value="PERSON">Person</option>
-                                    <option value="CHECKBOX">Checkbox</option>
-                                    <option value="URL">URL</option>
-                                    <option value="EMAIL">Email</option>
-                                    <option value="PHONE">Phone</option>
-                                    <option value="STATUS">Status</option>
-                                </select>
-                                <input name="options" placeholder="Comma separated options (for Select types)" style={inputStyle} />
-                                <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>Add Property</button>
-                            </form>
-                        </div>
-
-                        {/* Draggable Properties List */}
-                        <div className="glass-card">
-                            <SettingsClient properties={properties} />
-                        </div>
+                    <h2 className="page-title" style={{ marginTop: 48, fontSize: 20 }}>Workspaces</h2>
+                    <div className="glass-card" style={{ marginBottom: 48 }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 13 }}>
+                            Manage the workspaces you are part of. Deleting a workspace will automatically migrate users to another workspace if available.
+                        </p>
+                        <WorkspaceSettingsClient
+                            workspaces={adminWorkspaces}
+                            activeWorkspaceId={currentUser.activeWorkspaceId as string}
+                        />
                     </div>
+
+
                 </>
             )}
 

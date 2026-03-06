@@ -8,91 +8,174 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   email     String    @unique
-  password  String    // Hashed password
+  password  String // Hashed password
   role      String    @default("STAFF") // "ADMIN" or "STAFF"
   isBanned  Boolean   @default(false)
-  photo     String?   // URL or Base64 for profile picture
-  bio       String?   // Short biography
-  birthdate DateTime? 
-  contents  Content[] @relation("ContentAuthor")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  photo     String? // URL or Base64 for profile picture
+  bio       String? // Short biography
+  birthdate DateTime?
+
+  activeWorkspaceId String? // ID of the currently active workspace
+  workspaceMembers  WorkspaceMember[] // Workspaces the user belongs to
+
+  contents      Content[] @relation("ContentAuthor")
+  assignedTasks Task[]    @relation("TaskAssignee")
+  createdTasks  Task[]    @relation("TaskCreator")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model Project {
-  id          String   @id @default(cuid())
+model Workspace {
+  id   String  @id @default(cuid())
+  name String
+  logo String? // URL or Emoji
+
+  members    WorkspaceMember[]
+  contents   Content[]
+  views      ContentView[]
+  properties PropertyDefinition[]
+  databases  Database[]
+  tasks      Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Database {
+  id          String  @id @default(cuid())
   name        String
-  description String?
-  status      String   @default("ACTIVE") // "ACTIVE", "COMPLETED", "ARCHIVED"
-  reports     Report[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  icon        String? // Emoji or URL
+  iconColor   String? // HEX or Tailwind color
+  description           String?
+  contentHeaderTemplate String? // Markdown template for the top of the content page
+  contentFooterTemplate String? // Markdown template for the bottom of the content page
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  contents   Content[]
+  properties PropertyDefinition[]
+  views      ContentView[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model Report {
-  id          String   @id @default(cuid())
-  title       String
-  metrics     String   // Storing JSON string of metrics (e.g. reach, impressions, engagement)
-  date        DateTime @default(now())
-  
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+model WorkspaceMember {
+  id          String @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String @default("MEMBER") // "ADMIN", "MEMBER"
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([workspaceId, userId]) // User can only be added to a workspace once
 }
 
 model Content {
-  id            String    @id @default(cuid())
-  title         String
-  caption       String?
-  mediaUrl      String?
-  customFields  String?   // JSON string storing custom properties { "propId": "value" }
-  orderIdx      Int       @default(0) // Used to sort items within the same calendar date
-  
-  history       ContentHistory[]
-  
-  authorId      String?
-  author        User?     @relation("ContentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  id           String  @id @default(cuid())
+  title        String
+  caption      String?
+  mediaUrl     String?
+  customFields String? // JSON string storing custom properties { "propId": "value" }
+  orderIdx     Int     @default(0) // Used to sort items within the same calendar date
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  history ContentHistory[]
+  tasks   Task[]
+
+  authorId String?
+  author   User?   @relation("ContentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  databaseId String?
+  database   Database? @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PropertyDefinition {
-  id          String   @id @default(cuid())
-  name        String   // Display Name e.g. "Status", "Priority"
-  type        String   // "TEXT", "NUMBER", "SELECT", "MULTI_SELECT", "DATE", "PERSON", "CHECKBOX"
-  options     String?  // JSON string array of options for SELECT/MULTI_SELECT types
-  colorConfig String?  // JSON mapping of option values to color names
-  order       Int      @default(0) // Used for drag-and-drop reordering
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String  @id @default(cuid())
+  name        String // Display Name e.g. "Status", "Priority"
+  type        String // "TEXT", "NUMBER", "SELECT", "MULTI_SELECT", "DATE", "PERSON", "CHECKBOX"
+  options     String? // JSON string array of options for SELECT/MULTI_SELECT types
+  colorConfig String? // JSON mapping of option values to color names
+  icon        String? // Lucide icon name
+  order       Int     @default(0) // Used for drag-and-drop reordering
+
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  databaseId String?
+  database   Database? @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ContentHistory {
-  id          String   @id @default(cuid())
-  contentId   String
-  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  snapshot    String   // Full JSON snapshot: { title, caption, customFields }
-  changedBy   String?  // User name at time of change
-  changeDesc  String?  // Human-readable description e.g. "Updated Status → Published"
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  contentId  String
+  content    Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  snapshot   String // Full JSON snapshot: { title, caption, customFields }
+  changedBy  String? // User name at time of change
+  changeDesc String? // Human-readable description e.g. "Updated Status → Published"
+  createdAt  DateTime @default(now())
 }
 
 model ContentView {
-  id                 String   @id @default(cuid())
+  id                 String  @id @default(cuid())
   name               String
-  layout             String   // e.g. "table", "board", "gallery", "list", "timeline", "calendar"
-  propertyVisibility String?  // JSON array of property IDs to show
-  filter             String?  // JSON representing active filters
-  sort               String?  // JSON representing sorting rules
-  groupBy            String?  // Property ID to group by
-  layoutConfig       String?  // JSON for view-specific settings like 'zoom' for timeline
-  order              Int      @default(0) // Order of the view tab
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  layout             String // e.g. "table", "board", "gallery", "list", "timeline", "calendar"
+  propertyVisibility String? // JSON array of property IDs to show
+  filter             String? // JSON representing active filters
+  sort               String? // JSON representing sorting rules
+  groupBy            String? // Property ID to group by
+  layoutConfig       String? // JSON for view-specific settings like 'zoom' for timeline
+  order              Int     @default(0) // Order of the view tab
+
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  databaseId String?
+  database   Database? @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("TODO") // "TODO", "IN_PROGRESS", "DONE"
+  priority    String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  dueDate     DateTime?
+
+  // Who the task is assigned to
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  // Who created the task
+  creatorId String
+  creator   User   @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  // Link to a specific content/database item
+  relatedItemId String?
+  relatedItem   Content? @relation(fields: [relatedItemId], references: [id], onDelete: SetNull)
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  content       String?   // Rich text content (markdown)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -8,7 +8,7 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 export async function createUser(formData: FormData) {
-    await requireAdmin();
+    const admin = await requireAdmin();
 
     const name = formData.get('name') as string;
     const email = formData.get('email') as string;
@@ -17,9 +17,20 @@ export async function createUser(formData: FormData) {
 
     const password = await bcrypt.hash(passwordRaw, 10);
 
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
         data: { name, email, password, role }
     });
+
+    // Auto-add the new user to the admin's active workspace so they share team data
+    if ((admin as any).activeWorkspaceId) {
+        await prisma.workspaceMember.create({
+            data: {
+                workspaceId: (admin as any).activeWorkspaceId,
+                userId: newUser.id,
+                role: role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+            }
+        }).catch(() => { /* ignore if already exists */ });
+    }
 
     revalidatePath('/settings');
 }
