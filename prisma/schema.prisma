@@ -14,6 +14,7 @@ model User {
   password  String // Hashed password
   role      String    @default("STAFF") // "ADMIN" or "STAFF"
   isBanned  Boolean   @default(false)
+  isActive  Boolean   @default(true) // Controls visibility in person selectors & analytics
   photo     String? // URL or Base64 for profile picture
   bio       String? // Short biography
   birthdate DateTime?
@@ -162,7 +163,7 @@ model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
-  status      String    @default("TODO") // "TODO", "IN_PROGRESS", "DONE"
+  status      String    @default("TODO") // "TODO", "IN_PROGRESS", "DONE", "CANCELED"
   priority    String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
   startDate   DateTime? 
   dueDate     DateTime?

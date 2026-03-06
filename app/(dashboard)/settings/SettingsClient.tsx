@@ -218,10 +218,11 @@ function EditUserModal({ user, onClose }: { user: any; onClose: () => void }) {
 // ─────────────────────────────────────────────
 // User Row with Edit Button
 // ─────────────────────────────────────────────
-export function UserRow({ user, currentUserId, banAction, deleteAction }: {
+export function UserRow({ user, currentUserId, banAction, activeAction, deleteAction }: {
     user: any;
     currentUserId: string;
     banAction: React.ReactNode;
+    activeAction?: React.ReactNode;
     deleteAction: React.ReactNode;
 }) {
     const [isEditing, setIsEditing] = useState(false);
@@ -230,10 +231,16 @@ export function UserRow({ user, currentUserId, banAction, deleteAction }: {
         <>
             {isEditing && <EditUserModal user={user} onClose={() => setIsEditing(false)} />}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: 'var(--sidebar-bg)', borderRadius: 8, border: '1px solid var(--border-color)', gap: 12 }}>
+            <div className="user-row-hover" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--bg-color)', borderRadius: 12, border: '1px solid var(--border-color)', gap: 16, transition: 'all 0.2s' }}>
+                <style>{`
+                    .user-row-hover:hover { 
+                        background: var(--sidebar-bg) !important; 
+                        border-color: rgba(255,255,255,0.1) !important; 
+                    }
+                `}</style>
                 {/* Avatar + Info */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--border-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--border-color)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, opacity: user.isActive === false ? 0.5 : 1 }}>
                         {user.photo
                             // eslint-disable-next-line @next/next/no-img-element
                             ? <img src={user.photo} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -241,8 +248,9 @@ export function UserRow({ user, currentUserId, banAction, deleteAction }: {
                         }
                     </div>
                     <div>
-                        <div style={{ fontWeight: 600 }}>
+                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
                             {user.name} {user.id === currentUserId && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>(You)</span>}
+                            {user.isActive === false && <span style={{ fontSize: 10, color: 'var(--text-secondary)', background: 'rgba(148,163,184,0.15)', padding: '2px 7px', borderRadius: 20, fontWeight: 700 }}>INACTIVE</span>}
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                             {user.email} • {user.role}
@@ -257,6 +265,7 @@ export function UserRow({ user, currentUserId, banAction, deleteAction }: {
                     <button onClick={() => setIsEditing(true)} style={{ padding: '6px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>Edit</button>
                     {user.id !== currentUserId && (
                         <>
+                            {activeAction}
                             {banAction}
                             {deleteAction}
                         </>

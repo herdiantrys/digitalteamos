@@ -55,7 +55,7 @@ export default function Topbar({ userName, userPhoto }: { userName: string, user
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             backgroundColor: 'rgba(255, 255, 255, 0.85)' // Light theme topbar
-        }}>
+        }} className="analytics-no-print">
             <style>{`
                 .premium-profile-btn {
                     display: flex;

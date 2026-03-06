@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { X, Calendar as CalendarIcon, Link as LinkIcon, User as UserIcon } from 'lucide-react';
 import { createTask } from '../../../lib/task-actions';
 import MarkdownEditor from '../../../components/content-management/MarkdownEditor';
+import RelationSelector from './RelationSelector';
 
 type User = { id: string; name: string; photo: string | null };
 type Relation = { id: string; title: string; database: { name: string; icon: string | null } | null };
@@ -23,6 +24,7 @@ export default function NewTaskModal({
 }) {
     const [isPending, startTransition] = useTransition();
     const [content, setContent] = useState('');
+    const [relatedItemId, setRelatedItemId] = useState('');
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -183,14 +185,13 @@ export default function NewTaskModal({
                         </div>
                         <div className="form-group">
                             <label className="form-label"><LinkIcon size={14} /> Related Item</label>
-                            <select name="relatedItemId" className="premium-input" style={{ cursor: 'pointer' }}>
-                                <option value="">No Relation</option>
-                                {relations.map(r => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.database?.icon || '📄'} {r.title}
-                                    </option>
-                                ))}
-                            </select>
+                            <input type="hidden" name="relatedItemId" value={relatedItemId} />
+                            <RelationSelector
+                                value={relatedItemId}
+                                onChange={setRelatedItemId}
+                                relations={relations}
+                                placeholder="Link to database content..."
+                            />
                         </div>
                     </div>
 

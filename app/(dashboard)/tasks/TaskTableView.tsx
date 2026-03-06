@@ -12,13 +12,14 @@ type SortDir = 'asc' | 'desc' | null;
 type SortCol = 'title' | 'status' | 'priority' | 'dueDate' | 'assignee' | 'relation';
 type GroupBy = 'STATUS' | 'PRIORITY' | 'ASSIGNEE' | 'NONE';
 
-const STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE'];
+const STATUS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE', 'CANCELED'];
 const PRIORITY_ORDER = ['HIGH', 'MEDIUM', 'LOW'];
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
     TODO: { label: 'To Do', color: 'var(--text-secondary)', bg: 'rgba(148,163,184,0.12)' },
     IN_PROGRESS: { label: 'In Progress', color: '#3498db', bg: 'rgba(52,152,219,0.12)' },
     DONE: { label: 'Done', color: '#2ecc71', bg: 'rgba(46,204,113,0.12)' },
+    CANCELED: { label: 'Canceled', color: '#ff4d4f', bg: 'rgba(255,77,79,0.10)' },
 };
 
 const PRIORITY_META: Record<string, { color: string; bg: string }> = {
@@ -49,7 +50,8 @@ function StatusBadge({ status, onClick }: { status: string; onClick?: (e: React.
                 fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8,
                 color: m.color, background: m.bg, cursor: onClick ? 'pointer' : 'default',
                 userSelect: 'none', display: 'inline-block', whiteSpace: 'nowrap',
-                transition: 'opacity 0.15s'
+                transition: 'opacity 0.15s',
+                textDecoration: status === 'CANCELED' ? 'line-through' : 'none'
             }}
         >
             {m.label}
@@ -414,7 +416,7 @@ export default function TaskTableView({
                                 {/* Rows */}
                                 {!collapsed[group.key] && group.items.map((task: any, rowIdx: number) => {
                                     const isSelected = selectedIds.has(task.id);
-                                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+                                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE' && task.status !== 'CANCELED';
                                     const canEdit = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
 
                                     return (

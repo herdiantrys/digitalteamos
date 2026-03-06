@@ -46,6 +46,17 @@ export async function updateUserStatus(userId: string, isBanned: boolean) {
     revalidatePath('/settings');
 }
 
+export async function toggleUserActive(userId: string, isActive: boolean) {
+    await requireAdmin();
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { isActive }
+    });
+
+    revalidatePath('/settings');
+}
+
 export async function deleteUser(userId: string) {
     await requireAdmin();
 

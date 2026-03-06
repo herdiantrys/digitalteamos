@@ -61,17 +61,19 @@ function WorkspaceRow({ workspace, isActive }: { workspace: any, isActive: boole
     };
 
     return (
-        <div style={{
+        <div className="workspace-row-hover" style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '16px',
-            background: isActive ? 'var(--sidebar-bg)' : 'var(--bg-color)',
-            border: isActive ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-            borderRadius: 8,
-            gap: 12,
+            padding: '20px 24px',
+            background: isActive ? 'linear-gradient(to right, rgba(46,170,220,0.05), transparent)' : 'var(--bg-color)',
+            border: isActive ? '1px solid rgba(46,170,220,0.4)' : '1px solid var(--border-color)',
+            borderRadius: 12,
+            gap: 16,
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            transition: 'all 0.2s',
+            boxShadow: isActive ? '0 4px 12px rgba(46,170,220,0.08)' : 'none'
         }}>
             {isActive && (
                 <div style={{

@@ -5,6 +5,7 @@ import { X, Calendar as CalendarIcon, Link as LinkIcon, User as UserIcon, Edit2,
 import { updateTask, deleteTask } from '../../../lib/task-actions';
 import MarkdownEditor from '../../../components/content-management/MarkdownEditor';
 import LucideIcon from '../../../components/LucideIcon';
+import RelationSelector from './RelationSelector';
 
 type User = { id: string; name: string; photo: string | null };
 type Relation = { id: string; title: string; database: { name: string; icon: string | null; iconColor?: string | null } | null };
@@ -408,6 +409,7 @@ function StatusSelector({ value, onChange, disabled }: { value: string, onChange
         { id: 'TODO', label: 'To Do', color: 'var(--text-secondary)', bg: 'rgba(255, 255, 255, 0.05)' },
         { id: 'IN_PROGRESS', label: 'In Progress', color: '#3498db', bg: 'rgba(52, 152, 219, 0.15)' },
         { id: 'DONE', label: 'Done', color: '#2ecc71', bg: 'rgba(46, 204, 113, 0.15)' },
+        { id: 'CANCELED', label: 'Canceled', color: '#ff4d4f', bg: 'rgba(255, 77, 79, 0.12)' },
     ];
 
     const current = options.find(o => o.id === value) || options[0];
@@ -500,134 +502,6 @@ function PrioritySelector({ value, onChange, disabled }: { value: string, onChan
                             {value === opt.id && <Check size={14} style={{ marginLeft: 'auto', color: '#007aff' }} />}
                         </div>
                     ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function RelationSelector({ value, onChange, disabled, relations }: { value: string, onChange: (val: string) => void, disabled: boolean, relations: Relation[] }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
-
-    const current = relations.find(r => r.id === value);
-    const filteredRelations = relations.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    return (
-        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-            <div
-                className="custom-select-trigger"
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                style={{ background: 'transparent', color: 'var(--text-primary)', opacity: disabled ? 0.7 : 1, width: '100%', maxWidth: 300, display: 'flex', justifyContent: 'space-between' }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {current ? (
-                        <>
-                            <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {current.database?.icon ? <LucideIcon name={current.database.icon as any} size={14} color={current.database.iconColor || 'var(--text-primary)'} /> : '📄'}
-                            </span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{current.title}</span>
-                            {current.database?.name && (
-                                <span style={{ fontSize: 10, color: 'var(--text-secondary)', background: 'var(--sidebar-bg)', padding: '2px 6px', borderRadius: 4, display: 'inline-block', whiteSpace: 'nowrap', border: '1px solid var(--border-color)' }}>
-                                    in {current.database.name}
-                                </span>
-                            )}
-                        </>
-                    ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>No Relation</span>
-                    )}
-                </div>
-            </div>
-
-            {isOpen && (
-                <div className="fade-in" style={{
-                    position: 'absolute', top: '100%', left: -8, marginTop: 4,
-                    background: 'var(--bg-color)', border: '1px solid var(--border-color)',
-                    borderRadius: 10, boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-                    zIndex: 20, minWidth: 280, maxWidth: 400, padding: 8,
-                    display: 'flex', flexDirection: 'column', gap: 8
-                }}>
-                    <input
-                        type="text"
-                        placeholder="Search relations..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        autoFocus
-                        style={{
-                            background: 'var(--sidebar-bg)', border: '1px solid var(--border-color)',
-                            borderRadius: 6, padding: '8px 12px', fontSize: 13, color: 'var(--text-primary)',
-                            outline: 'none', width: '100%'
-                        }}
-                    />
-                    <div className="custom-scrollbar" style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {/* Option for clearing relation */}
-                        <div
-                            onClick={() => { onChange(''); setIsOpen(false); setSearchQuery(''); }}
-                            style={{
-                                padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
-                                background: !value ? 'var(--hover-bg)' : 'transparent',
-                                color: 'var(--text-secondary)'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
-                            onMouseLeave={e => e.currentTarget.style.background = !value ? 'var(--hover-bg)' : 'transparent'}
-                        >
-                            No Relation
-                            {!value && <Check size={14} style={{ marginLeft: 'auto', color: 'var(--text-secondary)' }} />}
-                        </div>
-
-                        <div style={{ height: 1, background: 'var(--border-color)', margin: '4px 0' }} />
-
-                        {filteredRelations.map(rel => (
-                            <div
-                                key={rel.id}
-                                onClick={() => { onChange(rel.id); setIsOpen(false); setSearchQuery(''); }}
-                                style={{
-                                    padding: '8px 12px', borderRadius: 6, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
-                                    background: value === rel.id ? 'var(--hover-bg)' : 'transparent',
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
-                                onMouseLeave={e => e.currentTarget.style.background = value === rel.id ? 'var(--hover-bg)' : 'transparent'}
-                            >
-                                <span style={{ fontSize: 13, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4, alignSelf: 'flex-start', marginTop: 2, flexShrink: 0 }}>
-                                    {rel.database?.icon ? <LucideIcon name={rel.database.icon as any} size={14} color={rel.database.iconColor || 'var(--text-primary)'} /> : '📄'}
-                                </span>
-                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, gap: 2 }}>
-                                    <span style={{ fontWeight: value === rel.id ? 600 : 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {rel.title}
-                                    </span>
-                                    {rel.database?.name && (
-                                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            in {rel.database.name}
-                                        </span>
-                                    )}
-                                </div>
-                                {value === rel.id && <Check size={14} style={{ marginLeft: 'auto', color: '#007aff', flexShrink: 0 }} />}
-                            </div>
-                        ))}
-                        {filteredRelations.length === 0 && (
-                            <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>
-                                No items found
-                            </div>
-                        )}
-                    </div>
                 </div>
             )}
         </div>
