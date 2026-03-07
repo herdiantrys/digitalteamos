@@ -23,7 +23,8 @@ export async function searchContent(query: string) {
 export async function getUserOptions() {
     await requireAuth();
     return await prisma.user.findMany({
-        select: { id: true, name: true },
+        where: { isActive: true },
+        select: { id: true, name: true, photo: true, email: true },
         orderBy: { name: 'asc' }
     });
 }

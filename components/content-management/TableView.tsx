@@ -4,7 +4,7 @@ import { useState, useMemo, useTransition, useEffect, useRef, Fragment } from 'r
 import { useRouter } from 'next/navigation';
 import EditableCell from './EditableCell';
 import { deleteContent, bulkDeleteContent, bulkUpdateContentProperty } from '../../lib/content-actions';
-import { Type, Hash, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, X, Trash2, ArrowDown, ArrowUp, ArrowUpDown, Check, Edit, Save, Plus } from 'lucide-react';
+import { Type, Hash, DollarSign, Percent, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, X, Trash2, ArrowDown, ArrowUp, ArrowUpDown, Check, Edit, Save, Plus } from 'lucide-react';
 import PermissionWarningModal from './PermissionWarningModal';
 import CreatePropertyModal from './CreatePropertyModal';
 import PropertyMenu from './PropertyMenu';
@@ -19,6 +19,8 @@ function getTypeIcon(type: string, customIcon?: string | null) {
     switch (type) {
         case 'TEXT': return <Type {...props} />;
         case 'NUMBER': return <Hash {...props} />;
+        case 'CURRENCY': return <DollarSign {...props} />;
+        case 'PERCENT': return <Percent {...props} />;
         case 'SELECT': return <ChevronDown {...props} />;
         case 'MULTI_SELECT': return <Layers {...props} />;
         case 'DATE': return <Calendar {...props} />;

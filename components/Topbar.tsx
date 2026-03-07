@@ -9,8 +9,17 @@ export default function Topbar({ userName, userPhoto }: { userName: string, user
 
     // UI States
     const [openPopover, setOpenPopover] = useState<'profile' | null>(null);
+    const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
     const profileRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        setCurrentTime(new Date());
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     const handleLogout = () => {
         startTransition(async () => {
@@ -131,6 +140,40 @@ export default function Topbar({ userName, userPhoto }: { userName: string, user
                 .popover-item.danger:hover {
                     background: rgba(255, 77, 79, 0.08);
                 }
+                .clock-container {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    background: linear-gradient(145deg, rgba(255,255,255,0.8), rgba(240,245,250,0.4));
+                    border: 1px solid rgba(0,0,0,0.04);
+                    box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.02);
+                }
+                .clock-time {
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    font-variant-numeric: tabular-nums;
+                    letter-spacing: 0.04em;
+                    display: flex;
+                    align-items: baseline;
+                    gap: 2px;
+                }
+                .clock-seconds {
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: var(--accent-color, #3b82f6);
+                    opacity: 0.8;
+                }
+                .clock-date {
+                    font-size: 12px;
+                    color: var(--text-secondary);
+                    font-weight: 500;
+                    border-left: 1px solid rgba(0,0,0,0.08);
+                    padding-left: 8px;
+                    text-transform: capitalize;
+                }
             `}</style>
 
             {/* Left side: Greeting */}
@@ -144,7 +187,25 @@ export default function Topbar({ userName, userPhoto }: { userName: string, user
             </div>
 
             {/* Right side: Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                {/* Clock */}
+                {currentTime && (
+                    <div className="clock-container">
+                        <div className="clock-time">
+                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':')}
+                            <span className="clock-seconds">
+                                {currentTime.getSeconds().toString().padStart(2, '0')}
+                            </span>
+                        </div>
+                        <div className="clock-date">
+                            {currentTime.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Vertical Divider */}
+                <div style={{ width: 1, height: 24, background: 'rgba(0,0,0,0.08)', margin: '0 4px' }} />
+
                 {/* User Profile */}
                 <div style={{ position: 'relative' }} ref={profileRef}>
                     <div

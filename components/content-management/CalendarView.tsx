@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { updateSingleContentField, updateContentField } from '../../lib/content-actions';
 import {
     ChevronLeft, ChevronRight, Hash, Menu,
-    Type, Calendar as CalIcon, User, ZoomIn, ZoomOut, Move, Plus
+    Type, Calendar as CalIcon, User, ZoomIn, ZoomOut, Move, Plus, DollarSign, Percent
 } from 'lucide-react';
 import { getBadgeColorObj } from '../../lib/colors';
 
@@ -956,6 +956,8 @@ function getTypeIcon(type: string) {
     switch (type) {
         case 'TEXT': return <Type {...p} />;
         case 'NUMBER': return <Hash {...p} />;
+        case 'CURRENCY': return <DollarSign {...p} />;
+        case 'PERCENT': return <Percent {...p} />;
         case 'SELECT': return <Menu {...p} />;
         case 'DATE': return <CalIcon {...p} />;
         case 'PERSON': return <User {...p} />;

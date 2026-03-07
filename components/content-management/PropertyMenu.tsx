@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-    Type, Hash, List, CheckSquare, Calendar, User,
+    Type, Hash, DollarSign, Percent, List, CheckSquare, Calendar, User,
     ChevronRight, Filter, ArrowDownUp, Layers, EyeOff,
     Trash2, Copy, ArrowLeft, ArrowRight, Table,
     Check, X, Search, Info, Settings2
@@ -22,6 +22,8 @@ interface Property {
 const PROPERTY_TYPES = [
     { id: 'TEXT', label: 'Text', icon: <Type size={16} /> },
     { id: 'NUMBER', label: 'Number', icon: <Hash size={16} /> },
+    { id: 'CURRENCY', label: 'Currency', icon: <DollarSign size={16} /> },
+    { id: 'PERCENT', label: 'Percent', icon: <Percent size={16} /> },
     { id: 'SELECT', label: 'Select', icon: <List size={16} /> },
     { id: 'MULTI_SELECT', label: 'Multi-select', icon: <Layers size={16} /> },
     { id: 'STATUS', label: 'Status', icon: <CheckSquare size={16} /> },

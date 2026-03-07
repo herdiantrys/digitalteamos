@@ -33,6 +33,7 @@ export default async function ContentPage() {
     });
 
     const users = await prisma.user.findMany({
+        where: { isActive: true },
         orderBy: { name: 'asc' },
         select: { id: true, name: true }
     });

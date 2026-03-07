@@ -2,7 +2,7 @@
 
 import EditableCell from './EditableCell';
 import { deleteContent } from '../../lib/content-actions';
-import { Type, Hash, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, X, Trash2 } from 'lucide-react';
+import { Type, Hash, DollarSign, Percent, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, X, Trash2 } from 'lucide-react';
 import PermissionWarningModal from './PermissionWarningModal';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -241,6 +241,8 @@ function getTypeIcon(type: string) {
     switch (type) {
         case 'TEXT': return <Type {...props} />;
         case 'NUMBER': return <Hash {...props} />;
+        case 'CURRENCY': return <DollarSign {...props} />;
+        case 'PERCENT': return <Percent {...props} />;
         case 'SELECT': return <ChevronDown {...props} />;
         case 'MULTI_SELECT': return <Layers {...props} />;
         case 'DATE': return <Calendar {...props} />;

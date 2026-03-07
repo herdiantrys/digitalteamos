@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, X, Type, Hash, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, AlertCircle } from 'lucide-react';
+import { Plus, X, Type, Hash, DollarSign, Percent, ChevronDown, Layers, Calendar, User, CheckSquare, Link as LinkIcon, AtSign, Phone, AlertCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { createPropertyDefinition } from '../../lib/property-actions';
 
 const PROPERTY_TYPES = [
     { value: 'TEXT', label: 'Text', icon: <Type size={16} /> },
     { value: 'NUMBER', label: 'Number', icon: <Hash size={16} /> },
+    { value: 'CURRENCY', label: 'Currency', icon: <DollarSign size={16} /> },
+    { value: 'PERCENT', label: 'Percent', icon: <Percent size={16} /> },
     { value: 'SELECT', label: 'Select', icon: <ChevronDown size={16} /> },
     { value: 'MULTI_SELECT', label: 'Multi-select', icon: <Layers size={16} /> },
     { value: 'DATE', label: 'Date', icon: <Calendar size={16} /> },

@@ -45,6 +45,7 @@ export default async function DatabasePage({ params }: { params: { id: string } 
     });
 
     const users = await prisma.user.findMany({
+        where: { isActive: true },
         orderBy: { name: 'asc' },
         select: { id: true, name: true, photo: true },
     });

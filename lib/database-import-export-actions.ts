@@ -22,7 +22,9 @@ function detectPropertyType(header: string): string {
     if (/jenis|tipe|type|sosmed|platform|channel|unit|bulan|month|place|lokasi|tempat/.test(n)) return 'SELECT';
     if (/tanggal|date|deadline|waktu|time|tayang|produksi/.test(n)) return 'DATE';
     if (/link|url|tautan|website/.test(n)) return 'URL';
-    if (/jumlah|count|angka|number|durasi|duration|harga|price|biaya/.test(n)) return 'NUMBER';
+    if (/harga|price|biaya|currency|rp|usd|uang/.test(n)) return 'CURRENCY';
+    if (/persen|percent|persentase|percentage|rate/.test(n)) return 'PERCENT';
+    if (/jumlah|count|angka|number|durasi|duration/.test(n)) return 'NUMBER';
     if (/done|selesai|active|aktif|check/.test(n)) return 'CHECKBOX';
     return 'TEXT';
 }
@@ -35,6 +37,8 @@ function normalizeValue(v: string, type: string): string {
             const d = new Date(clean);
             return isNaN(d.getTime()) ? clean : d.toISOString().split('T')[0];
         case 'NUMBER':
+        case 'CURRENCY':
+        case 'PERCENT':
             return clean.replace(/[^0-9.-]/g, '');
         case 'CHECKBOX':
             return /^(true|1|yes|ya|check|checked|v)$/i.test(clean) ? 'true' : 'false';
@@ -324,7 +328,7 @@ export async function executeDatabaseImportCSV(databaseId: string, opts: ImportO
 
     const [existingTitles, allUsers] = await Promise.all([
         prisma.content.findMany({ where: { databaseId, workspaceId: user.activeWorkspaceId }, select: { id: true, title: true } }),
-        prisma.user.findMany({ select: { id: true, name: true, email: true } }) as Promise<{ id: string; name: string | null; email: string }[]>
+        prisma.user.findMany({ where: { isActive: true }, select: { id: true, name: true, email: true } }) as Promise<{ id: string; name: string | null; email: string }[]>
     ]);
     const titleMap = new Map<string, string>(existingTitles.map((c: any) => [c.title.toLowerCase().trim(), c.id]));
     const userByName = new Map<string, string>(allUsers.map(u => [(u.name || '').toLowerCase().trim(), u.id]));

@@ -195,19 +195,23 @@ export default function EditableCell({
         );
     }
 
-    // ── Default: TEXT / NUMBER / EMAIL / PHONE ────────────────────────────────
+    // ── Default: TEXT / NUMBER / CURRENCY / PERCENT / EMAIL / PHONE ────────────────────────────────
     return (
-        <input
-            type={type === 'NUMBER' ? 'number' : type === 'EMAIL' ? 'email' : type === 'PHONE' ? 'tel' : 'text'}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={() => handleSave(value)}
-            placeholder="-"
-            style={baseStyle}
-            disabled={isEditingDisabled}
-            onFocus={e => { (e.target as HTMLInputElement).style.border = '1px solid var(--border-color)'; (e.target as HTMLInputElement).style.background = 'var(--bg-color)'; }}
-            onBlurCapture={e => { (e.target as HTMLInputElement).style.border = '1px solid transparent'; (e.target as HTMLInputElement).style.background = 'transparent'; }}
-        />
+        <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+            {type === 'CURRENCY' && <span style={{ position: 'absolute', left: 8, color: 'var(--text-secondary)', fontSize: 13 }}>$</span>}
+            <input
+                type={type === 'NUMBER' || type === 'CURRENCY' || type === 'PERCENT' ? 'number' : type === 'EMAIL' ? 'email' : type === 'PHONE' ? 'tel' : 'text'}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={() => handleSave(value)}
+                placeholder="-"
+                style={{ ...baseStyle, paddingLeft: type === 'CURRENCY' ? 20 : 8, paddingRight: type === 'PERCENT' ? 24 : 8 }}
+                disabled={isEditingDisabled}
+                onFocus={e => { (e.target as HTMLInputElement).style.border = '1px solid var(--border-color)'; (e.target as HTMLInputElement).style.background = 'var(--bg-color)'; }}
+                onBlurCapture={e => { (e.target as HTMLInputElement).style.border = '1px solid transparent'; (e.target as HTMLInputElement).style.background = 'transparent'; }}
+            />
+            {type === 'PERCENT' && <span style={{ position: 'absolute', right: 8, color: 'var(--text-secondary)', fontSize: 13 }}>%</span>}
+        </div>
     );
 }
 

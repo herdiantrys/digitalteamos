@@ -156,45 +156,45 @@ export default function CreateContentModal({
                         <div style={{ padding: '24px', overflowY: 'auto' }}>
                             <form id="create-content-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Title</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 20px' }}>
                                     <input
                                         name="title"
                                         placeholder="Enter a descriptive title..."
                                         required
                                         autoFocus
                                         style={{
-                                            width: '100%', padding: '10px 14px', fontSize: 15,
-                                            border: '1px solid var(--border-color)', borderRadius: 8,
-                                            fontFamily: 'inherit',
-                                            background: 'var(--input-bg)', color: 'var(--text-primary)',
-                                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)',
-                                            outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s'
+                                            width: '100%', padding: '16px 20px', fontSize: 24, fontWeight: 700,
+                                            border: 'none', borderBottom: '2px solid var(--border-color)', borderRadius: '12px 12px 0 0',
+                                            fontFamily: 'inherit', letterSpacing: '-0.02em',
+                                            background: 'linear-gradient(to bottom, var(--sidebar-bg), var(--bg-color))',
+                                            color: 'var(--text-primary)',
+                                            outline: 'none', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                                         }}
-                                        onFocus={e => { e.currentTarget.style.borderColor = '#007aff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,122,255,0.1)'; }}
-                                        onBlur={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.boxShadow = 'none'; }}
-                                    />
-                                </div>
-
-                                {/* ── Content / Caption ── */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <MarkdownEditor
-                                        value={caption}
-                                        onChange={setCaption}
+                                        onFocus={e => { e.currentTarget.style.borderBottomColor = '#007aff'; e.currentTarget.style.background = 'var(--bg-color)'; }}
+                                        onBlur={e => { e.currentTarget.style.borderBottomColor = 'var(--border-color)'; e.currentTarget.style.background = 'linear-gradient(to bottom, var(--sidebar-bg), var(--bg-color))'; }}
                                     />
                                 </div>
 
                                 {databaseId && <input type="hidden" name="databaseId" value={databaseId} />}
 
                                 {properties.length > 0 && (
-                                    <div style={{ padding: '16px', background: 'var(--sidebar-bg)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                                        <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: 12, marginTop: 0 }}>
-                                            Properties
-                                        </h3>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                    <div style={{ padding: '0 20px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                            <div style={{ width: 4, height: 16, background: '#007aff', borderRadius: 2 }} />
+                                            <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', margin: 0 }}>
+                                                Properties
+                                            </h3>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px 24px' }}>
                                             {properties.map(prop => (
-                                                <div key={prop.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{prop.name}</label>
+                                                <div key={prop.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }} className="property-input-group">
+                                                    <style>{`
+                                                        .property-input-group:hover .prop-label { color: var(--text-primary); }
+                                                        .prop-label { transition: color 0.2s; }
+                                                    `}</style>
+                                                    <label className="prop-label" style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        {prop.name}
+                                                    </label>
 
                                                     {/* Custom Input mapping based on type */}
                                                     {prop.type === 'SELECT' || prop.type === 'STATUS' ? (
@@ -205,7 +205,6 @@ export default function CreateContentModal({
                                                             placeholder="-- Set --"
                                                             propertyId={prop.id}
                                                             colorConfigRaw={(prop as any).colorConfig}
-                                                        // For badge dropdown we'd ideally pass defaultValue as well, but standard inputs are our priority for Dates
                                                         />
                                                     ) : prop.type === 'PERSON' ? (
                                                         <BadgeDropdown
@@ -228,11 +227,15 @@ export default function CreateContentModal({
                                                         />
                                                     ) : prop.type === 'DATE' ? (
                                                         <input type="date" name={`prop_${prop.id}`} defaultValue={prefillData[`prop_${prop.id}`] || ''} style={inputStyle} />
-                                                    ) : prop.type === 'NUMBER' ? (
-                                                        <input type="number" name={`prop_${prop.id}`} placeholder="0" defaultValue={prefillData[`prop_${prop.id}`] || ''} style={inputStyle} />
+                                                    ) : prop.type === 'NUMBER' || prop.type === 'CURRENCY' || prop.type === 'PERCENT' ? (
+                                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                                            {prop.type === 'CURRENCY' && <span style={{ position: 'absolute', left: 12, color: 'var(--text-secondary)', fontSize: 13 }}>$</span>}
+                                                            <input type="number" name={`prop_${prop.id}`} placeholder="0" defaultValue={prefillData[`prop_${prop.id}`] || ''} style={{ ...inputStyle, paddingLeft: prop.type === 'CURRENCY' ? 24 : 14, paddingRight: prop.type === 'PERCENT' ? 24 : 14 }} />
+                                                            {prop.type === 'PERCENT' && <span style={{ position: 'absolute', right: 12, color: 'var(--text-secondary)', fontSize: 13 }}>%</span>}
+                                                        </div>
                                                     ) : prop.type === 'CHECKBOX' ? (
-                                                        <div style={{ height: '32px', display: 'flex', alignItems: 'center' }}>
-                                                            <input type="checkbox" name={`prop_${prop.id}`} value="true" defaultChecked={prefillData[`prop_${prop.id}`] === 'true'} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                                                        <div style={{ height: '38px', display: 'flex', alignItems: 'center', padding: '0 12px', background: 'var(--input-bg)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                                            <input type="checkbox" name={`prop_${prop.id}`} value="true" defaultChecked={prefillData[`prop_${prop.id}`] === 'true'} style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#007aff' }} />
                                                         </div>
                                                     ) : (
                                                         <input type="text" name={`prop_${prop.id}`} placeholder={`Enter ${prop.name}`} defaultValue={prefillData[`prop_${prop.id}`] || ''} style={inputStyle} />
@@ -242,6 +245,22 @@ export default function CreateContentModal({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* ── Content / Caption (Moved to bottom) ── */}
+                                <div style={{ display: 'flex', flexDirection: 'column', padding: '0 20px 20px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, marginTop: properties.length > 0 ? 12 : 0 }}>
+                                        <div style={{ width: 4, height: 16, background: '#007aff', borderRadius: 2 }} />
+                                        <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', margin: 0 }}>
+                                            Content Details
+                                        </h3>
+                                    </div>
+                                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                                        <MarkdownEditor
+                                            value={caption}
+                                            onChange={setCaption}
+                                        />
+                                    </div>
+                                </div>
                             </form>
                         </div>
 
@@ -289,13 +308,15 @@ export default function CreateContentModal({
 }
 
 const inputStyle = {
-    padding: '8px 12px',
+    padding: '10px 14px',
     border: '1px solid var(--border-color)',
-    borderRadius: 6,
+    borderRadius: '8px',
     background: 'var(--input-bg)',
     color: 'var(--text-primary)',
-    fontSize: 13,
+    fontSize: '14px',
     outline: 'none',
     width: '100%',
-    boxSizing: 'border-box' as const
+    boxSizing: 'border-box' as const,
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
 };
