@@ -17,7 +17,6 @@ export async function getDatabaseViews(databaseId: string) {
 
 export async function createDatabaseView(databaseId: string, data: { name: string; layout: string; order: number }) {
     const user = await requireAuth();
-    if (user.role !== 'ADMIN') throw new Error('Only admins can create views.');
     if (!user.activeWorkspaceId) throw new Error('No active workspace');
 
     const view = await prisma.contentView.create({
@@ -43,7 +42,6 @@ export async function updateDatabaseView(id: string, databaseId: string, data: P
     layoutConfig: string | null;
 }>) {
     const user = await requireAuth();
-    if (user.role !== 'ADMIN') throw new Error('Only admins can update views.');
 
     const view = await prisma.contentView.update({
         where: { id },
@@ -55,7 +53,6 @@ export async function updateDatabaseView(id: string, databaseId: string, data: P
 
 export async function deleteDatabaseView(id: string, databaseId: string) {
     const user = await requireAuth();
-    if (user.role !== 'ADMIN') throw new Error('Only admins can delete views.');
 
     await prisma.contentView.deleteMany({ where: { id } });
     revalidatePath(`/databases/${databaseId}`);
@@ -63,7 +60,6 @@ export async function deleteDatabaseView(id: string, databaseId: string) {
 
 export async function updateDatabaseViewOrder(updates: { id: string; order: number }[], databaseId: string) {
     const user = await requireAuth();
-    if (user.role !== 'ADMIN') throw new Error('Only admins can reorder views.');
 
     await prisma.$transaction(
         updates.map(u => prisma.contentView.update({

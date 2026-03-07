@@ -264,8 +264,8 @@ export default function MarkdownEditor({ value, onChange, contentTitle, isSaving
                 >
                     {/* BlockNote styles */}
                     <style>{`
-                        .bn-container { font-family: inherit; }
-                        .bn-editor { padding-left: 24px !important; padding-right: 24px !important; }
+                        .bn-container { font-family: inherit; padding: 0 16px; }
+                        .bn-editor { padding-left: 36px !important; padding-right: 36px !important; }
                         .markdown-render p { margin: 0 0 4px; }
                         .markdown-render h1, .markdown-render h2, .markdown-render h3 { margin: 4px 0; }
                         .markdown-render strong { font-weight: 700; }
@@ -315,7 +315,7 @@ export default function MarkdownEditor({ value, onChange, contentTitle, isSaving
                     {isSaving ? <><Clock size={12} /> Saving...</> : <><Check size={12} className="text-green-500" /> Saved</>}
                 </span>
             </div>
-        </div>
+        </div >
     );
 
     if (isFullscreen && typeof document !== 'undefined') {

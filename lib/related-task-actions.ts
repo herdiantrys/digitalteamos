@@ -12,11 +12,18 @@ export async function getRelatedTasks(contentId: string) {
     // Make sure user has access (implicitly handled if workspaceId matches)
     const tasks = await prisma.task.findMany({
         where: {
-            relatedItemId: contentId,
+            relatedItems: {
+                some: { id: contentId }
+            },
             workspaceId: user.activeWorkspaceId
         },
         include: {
-            assignee: { select: { id: true, name: true, photo: true } }
+            assignees: { select: { id: true, name: true, photo: true } },
+            relatedItems: {
+                include: {
+                    database: true
+                }
+            }
         },
         orderBy: { dueDate: 'asc' }
     });

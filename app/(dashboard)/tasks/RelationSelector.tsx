@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, Check, Link as LinkIcon, ChevronRight, X } from 'lucide-react';
+import { Search, Check, Link as LinkIcon, ChevronRight, X, ExternalLink } from 'lucide-react';
 import LucideIcon from '../../../components/LucideIcon';
 
 export type RelationItem = {
     id: string;
     title: string;
+    databaseId?: string | null;
     database: {
         name: string;
         icon: string | null;
@@ -15,19 +16,21 @@ export type RelationItem = {
 };
 
 interface RelationSelectorProps {
-    value: string;
-    onChange: (val: string) => void;
+    value: string[];
+    onChange: (val: string[]) => void;
     disabled?: boolean;
     relations: RelationItem[];
     placeholder?: string;
+    onVisit?: (item: RelationItem) => void;
 }
 
 export default function RelationSelector({
-    value,
+    value = [],
     onChange,
     disabled = false,
     relations,
-    placeholder = 'Select relation...'
+    placeholder = 'Select relations...',
+    onVisit,
 }: RelationSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -36,22 +39,24 @@ export default function RelationSelector({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Group relations by database name
-    const groupedRelations = useMemo(() => {
+    const filteredRelations = useMemo(() => {
         const query = searchQuery.toLowerCase();
-        const filtered = relations.filter(r =>
+        return relations.filter(r =>
             r.title.toLowerCase().includes(query) ||
             r.database?.name.toLowerCase().includes(query)
         );
+    }, [relations, searchQuery]);
 
+    const groupedRelations = useMemo(() => {
         const groups: Record<string, RelationItem[]> = {};
-        filtered.forEach(rel => {
+        filteredRelations.forEach(rel => {
             const dbName = rel.database?.name || 'Uncategorized';
             if (!groups[dbName]) groups[dbName] = [];
             groups[dbName].push(rel);
         });
 
         return Object.entries(groups).map(([name, items]) => ({ name, items }));
-    }, [relations, searchQuery]);
+    }, [filteredRelations]);
 
     // Flatten for keyboard navigation
     const flattenedItems = useMemo(() => {
@@ -87,20 +92,23 @@ export default function RelationSelector({
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (flattenedItems[activeIndex]) {
-                handleSelect(flattenedItems[activeIndex].id);
+                handleToggle(flattenedItems[activeIndex].id);
             }
         } else if (e.key === 'Escape') {
             setIsOpen(false);
         }
     };
 
-    const handleSelect = (id: string) => {
-        onChange(id);
-        setIsOpen(false);
-        setSearchQuery('');
+    const handleToggle = (id: string) => {
+        const newValue = value.includes(id)
+            ? value.filter(v => v !== id)
+            : [...value, id];
+        onChange(newValue);
     };
 
-    const current = relations.find(r => r.id === value);
+    const selectedItems = useMemo(() => {
+        return relations.filter(r => value.includes(r.id));
+    }, [relations, value]);
 
     return (
         <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
@@ -110,57 +118,68 @@ export default function RelationSelector({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: 12,
+                    padding: '8px 12px',
+                    borderRadius: 14,
                     background: 'var(--input-bg, var(--sidebar-bg))',
-                    border: isOpen ? '1px solid #007aff' : '1px solid var(--border-color)',
+                    border: isOpen ? '1.5px solid #007aff' : '1.5px solid rgba(150, 150, 150, 0.2)',
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     opacity: disabled ? 0.6 : 1,
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: isOpen ? '0 0 0 4px rgba(0, 122, 255, 0.1)' : 'none',
-                    minHeight: 44
+                    minHeight: 48,
+                    flexWrap: 'wrap',
+                    gap: 6
                 }}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden', flex: 1 }}>
-                    <LinkIcon size={14} style={{ color: current ? '#007aff' : 'var(--text-secondary)', transition: 'color 0.2s' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {current ? (
-                            <>
-                                <span style={{
-                                    fontSize: 12,
-                                    background: 'rgba(255,255,255,0.05)',
-                                    padding: '2px 6px',
-                                    borderRadius: 6,
-                                    display: 'inline-flex',
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+                    <LinkIcon size={14} style={{ color: selectedItems.length > 0 ? '#007aff' : 'var(--text-secondary)', marginRight: 4 }} />
+                    {selectedItems.length > 0 ? (
+                        selectedItems.map(item => (
+                            <div
+                                key={item.id}
+                                style={{
+                                    display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0,
-                                    border: '1px solid var(--border-color)'
-                                }}>
-                                    {current.database?.icon ?
-                                        <LucideIcon name={current.database.icon as any} size={14} color={current.database.iconColor || 'inherit'} /> :
-                                        '📄'
-                                    }
+                                    gap: 6,
+                                    background: 'rgba(0, 122, 255, 0.1)',
+                                    color: '#007aff',
+                                    padding: '2px 6px 2px 8px',
+                                    borderRadius: 8,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    border: '1px solid rgba(0, 122, 255, 0.2)'
+                                }}
+                            >
+                                {item.database?.icon && <LucideIcon name={item.database.icon as any} size={12} />}
+                                <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {item.title}
                                 </span>
-                                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{current.title}</span>
-                                {current.database?.name && (
-                                    <span style={{
-                                        fontSize: 10,
-                                        color: 'var(--text-secondary)',
-                                        background: 'rgba(55,53,47,0.05)',
-                                        padding: '2px 6px',
-                                        borderRadius: 4,
-                                        fontWeight: 600,
-                                        border: '1px solid var(--border-color)'
-                                    }}>
-                                        {current.database.name}
+                                {/* Navigate to database page */}
+                                {onVisit && item.databaseId && (
+                                    <span
+                                        title={`Open in ${item.database?.name || 'database'}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onVisit(item);
+                                        }}
+                                        style={{ cursor: 'pointer', opacity: 0.7, flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                                    >
+                                        <ExternalLink size={11} />
                                     </span>
                                 )}
-                            </>
-                        ) : (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{placeholder}</span>
-                        )}
-                    </div>
+                                <X
+                                    size={12}
+                                    style={{ cursor: 'pointer', opacity: 0.7, flexShrink: 0 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggle(item.id);
+                                    }}
+                                />
+                            </div>
+                        ))
+                    ) : (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{placeholder}</span>
+                    )}
                 </div>
                 <ChevronRight
                     size={16}
@@ -183,15 +202,15 @@ export default function RelationSelector({
                         right: 0,
                         background: 'var(--bg-color)',
                         border: '1px solid var(--border-color)',
-                        borderRadius: 14,
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                        borderRadius: 16,
+                        boxShadow: '0 24px 48px rgba(0,0,0,0.3)',
                         zIndex: 1000,
-                        padding: 8,
+                        padding: 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 8,
+                        gap: 10,
                         transformOrigin: 'top',
-                        animation: 'slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                        animation: 'slideDownFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                 >
                     <style>{`
@@ -201,109 +220,101 @@ export default function RelationSelector({
                         }
                     `}</style>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: 12, color: 'var(--text-secondary)' }} />
+                        <Search size={14} style={{ position: 'absolute', left: 14, color: 'var(--text-secondary)' }} />
                         <input
                             ref={inputRef}
                             type="text"
-                            placeholder="Search content or database..."
+                            placeholder="Search and multi-select content..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             onKeyDown={handleKeyDown}
                             style={{
                                 width: '100%',
-                                background: 'var(--sidebar-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 10,
-                                padding: '10px 12px 10px 36px',
-                                fontSize: 13,
+                                background: 'rgba(150, 150, 150, 0.05)',
+                                border: '1px solid rgba(150, 150, 150, 0.1)',
+                                borderRadius: 12,
+                                padding: '12px 12px 12px 40px',
+                                fontSize: 14,
                                 color: 'var(--text-primary)',
                                 outline: 'none',
-                                transition: 'border-color 0.2s'
+                                transition: 'all 0.2s'
                             }}
+                            onFocus={e => e.target.parentElement!.style.borderColor = '#007aff'}
                         />
                     </div>
 
-                    <div className="custom-scrollbar" style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-                        <div
-                            onClick={() => handleSelect('')}
-                            style={{
-                                padding: '10px 12px',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 10,
-                                fontSize: 13,
-                                background: !value ? 'rgba(0,122,255,0.06)' : 'transparent',
-                                color: !value ? '#007aff' : 'var(--text-secondary)',
-                                transition: 'all 0.1s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg)'}
-                            onMouseLeave={e => e.currentTarget.style.background = !value ? 'rgba(0,122,255,0.06)' : 'transparent'}
-                        >
-                            <X size={14} />
-                            No Relation
-                            {!value && <Check size={14} style={{ marginLeft: 'auto' }} />}
-                        </div>
-
+                    <div className="custom-scrollbar" style={{ maxHeight: 350, overflowY: 'auto', paddingRight: 4 }}>
                         {groupedRelations.map(group => (
-                            <div key={group.name} style={{ marginTop: 8 }}>
+                            <div key={group.name} style={{ marginBottom: 12 }}>
                                 <div style={{
                                     padding: '4px 12px',
                                     fontSize: 10,
                                     fontWeight: 800,
                                     color: 'var(--text-secondary)',
                                     textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
+                                    letterSpacing: '0.08em',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 6
+                                    gap: 8,
+                                    marginBottom: 4
                                 }}>
-                                    <div style={{ width: 12, height: 1, background: 'var(--border-color)' }} />
                                     {group.name}
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(150, 150, 150, 0.1)' }} />
                                 </div>
                                 {group.items.map(rel => {
-                                    const isSelected = value === rel.id;
+                                    const isSelected = value.includes(rel.id);
                                     const isHovered = flattenedItems[activeIndex]?.id === rel.id;
 
                                     return (
                                         <div
                                             key={rel.id}
-                                            onClick={() => handleSelect(rel.id)}
+                                            onClick={() => handleToggle(rel.id)}
                                             style={{
                                                 padding: '10px 12px',
-                                                borderRadius: 8,
+                                                borderRadius: 10,
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: 10,
-                                                fontSize: 13,
+                                                gap: 12,
+                                                fontSize: 14,
                                                 marginTop: 2,
                                                 background: isSelected ? 'rgba(0,122,255,0.08)' : (isHovered ? 'var(--hover-bg)' : 'transparent'),
                                                 transition: 'all 0.15s',
-                                                border: isHovered && !isSelected ? '1px solid rgba(0,122,255,0.2)' : '1px solid transparent'
+                                                border: '1px solid transparent',
+                                                borderColor: isHovered && !isSelected ? 'rgba(0,122,255,0.2)' : 'transparent'
                                             }}
                                             onMouseEnter={() => {
                                                 const idx = flattenedItems.findIndex(f => f.id === rel.id);
                                                 setActiveIndex(idx);
                                             }}
                                         >
-                                            <span style={{
-                                                fontSize: 13,
-                                                background: 'rgba(255,255,255,0.05)',
-                                                padding: '2px 6px',
+                                            <div style={{
+                                                width: 18, height: 18,
                                                 borderRadius: 6,
-                                                display: 'inline-flex',
+                                                border: isSelected ? 'none' : '2px solid rgba(150, 150, 150, 0.3)',
+                                                background: isSelected ? '#007aff' : 'transparent',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                transition: 'all 0.2s'
+                                            }}>
+                                                {isSelected && <Check size={12} color="white" />}
+                                            </div>
+
+                                            <span style={{
+                                                fontSize: 14,
+                                                background: 'rgba(150, 150, 150, 0.1)',
+                                                width: 30, height: 30,
+                                                borderRadius: 8,
+                                                display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                flexShrink: 0,
-                                                border: '1px solid var(--border-color)'
+                                                flexShrink: 0
                                             }}>
                                                 {rel.database?.icon ?
-                                                    <LucideIcon name={rel.database.icon as any} size={14} color={rel.database.iconColor || 'inherit'} /> :
+                                                    <LucideIcon name={rel.database.icon as any} size={16} color={rel.database.iconColor || 'inherit'} /> :
                                                     '📄'
                                                 }
                                             </span>
+
                                             <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
                                                 <span style={{
                                                     fontWeight: isSelected ? 700 : 500,
@@ -315,7 +326,6 @@ export default function RelationSelector({
                                                     {rel.title}
                                                 </span>
                                             </div>
-                                            {isSelected && <Check size={14} style={{ marginLeft: 'auto', color: '#007aff', flexShrink: 0 }} />}
                                         </div>
                                     );
                                 })}
@@ -323,13 +333,33 @@ export default function RelationSelector({
                         ))}
 
                         {groupedRelations.length === 0 && searchQuery && (
-                            <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
-                                <div style={{ fontSize: 24, marginBottom: 8 }}>🔍</div>
-                                No matching items found<br />
-                                <span style={{ fontSize: 11, opacity: 0.7 }}>Try a different search term</span>
+                            <div style={{ padding: '40px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+                                <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+                                <p style={{ fontWeight: 600, margin: 0 }}>No matching items found</p>
+                                <p style={{ opacity: 0.7, margin: '4px 0 0' }}>Try a different search term</p>
                             </div>
                         )}
                     </div>
+
+                    {value.length > 0 && (
+                        <div style={{
+                            padding: '12px', borderTop: '1px solid rgba(150, 150, 150, 0.1)',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                {value.length} items selected
+                            </span>
+                            <button
+                                onClick={() => onChange([])}
+                                style={{
+                                    background: 'transparent', border: 'none', color: '#ff4d4f',
+                                    fontSize: 12, fontWeight: 700, cursor: 'pointer'
+                                }}
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

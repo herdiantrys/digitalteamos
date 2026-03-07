@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useTransition } from 'react';
-import { updateTaskDueDate } from '../../../lib/task-actions';
+import { useState, useMemo, useRef, useEffect, useTransition, useCallback } from 'react';
+import { updateTaskDates } from '../../../lib/task-actions';
 import { ChevronDown, ChevronRight, User as UserIcon } from 'lucide-react';
+import { useTimelinePan } from '../../../hooks/useTimelinePan';
 
 const FULL_MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -75,7 +76,6 @@ function TimelineHeader({ topRowItems, bottomRowItems, zoom, leftPanelWidth }: {
                     ))}
                 </div>
             </div>
-            {/* Soft shadow under header */}
             <div style={{ height: 4, width: '100%', background: 'linear-gradient(to bottom, rgba(0,0,0,0.03), transparent)', position: 'absolute', top: 68, pointerEvents: 'none' }} />
         </div>
     );
@@ -100,25 +100,81 @@ export default function TaskTimelineView({
     const [tasks, setTasks] = useState(initialTasks);
     const [, startTransition] = useTransition();
 
-    useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
-
     const [startDateStr, setStartDateStr] = useState(() => {
         const d = new Date(); d.setDate(d.getDate() - 15);
         return d.toISOString().slice(0, 10);
     });
+
     const gridRef = useRef<HTMLDivElement>(null);
+    const LEFT_PANEL = 300;
+    const HEADER_HEIGHT = 68;
+    const ROW_HEIGHT = 44;
 
     const conf = ZOOM_CONFIG[zoom];
     const colW = conf.colW;
     const totalDays = conf.totalDays;
     const startDate = useMemo(() => new Date(startDateStr), [startDateStr]);
 
+    /* Resize state */
+    const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
+    const resizeRef = useRef<{ id: string; side: 'left' | 'right'; origStart: Date; origEnd: Date } | null>(null);
+
+    /* Drag state */
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+
+    useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
+
+    const canEdit = useCallback((task: any) =>
+        currentUser.role === 'ADMIN' || task.assignees?.some((a: any) => a.id === currentUser.id),
+        [currentUser]
+    );
+
+    const commitTaskChange = useCallback(async (taskId: string, start: Date, end: Date) => {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, startDate: start, dueDate: end } : t));
+        if (onUpdate) onUpdate({ id: taskId, startDate: start, dueDate: end });
+        startTransition(async () => {
+            try {
+                await updateTaskDates(taskId, start, end);
+            } catch (err: any) {
+                setTasks(initialTasks);
+                alert(err.message || 'Failed to update dates');
+            }
+        });
+    }, [onUpdate, initialTasks]);
+
+    // Handle Resize Move/Up
+    useEffect(() => {
+        if (!resizingTaskId) return;
+        const onMove = (e: MouseEvent) => {
+            const rs = resizeRef.current; if (!rs) return;
+            const container = gridRef.current; if (!container) return;
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left + container.scrollLeft - LEFT_PANEL;
+            const dayOffset = Math.floor(x / colW);
+            const tgt = addDays(startDate, dayOffset);
+
+            const ns = rs.side === 'left' ? (tgt > rs.origEnd ? rs.origEnd : tgt) : rs.origStart;
+            const ne = rs.side === 'right' ? (tgt < rs.origStart ? rs.origStart : tgt) : rs.origEnd;
+
+            setTasks(prev => prev.map(t => t.id === rs.id ? { ...t, startDate: ns, dueDate: ne } : t));
+            resizeRef.current = { ...rs, origStart: ns, origEnd: ne };
+        };
+        const onUp = () => {
+            const rs = resizeRef.current;
+            setResizingTaskId(null);
+            resizeRef.current = null;
+            if (rs) commitTaskChange(rs.id, rs.origStart, rs.origEnd);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    }, [resizingTaskId, startDate, colW, commitTaskChange]);
+
     const { topRowItems, bottomRowItems } = useMemo(() => {
         const top: any[] = [];
         const bottom: any[] = [];
         const today = new Date();
 
-        // Top Row
         if (zoom === 'hours') {
             for (let i = 0; i < totalDays; i++) {
                 const d = addDays(startDate, i);
@@ -145,7 +201,6 @@ export default function TaskTimelineView({
             }
         }
 
-        // Bottom Row
         if (zoom === 'hours') {
             for (let i = 0; i < totalDays; i++) {
                 const d = addDays(startDate, i);
@@ -198,15 +253,16 @@ export default function TaskTimelineView({
             });
         } else if (groupBy === 'PRIORITY') {
             const priorityOrder = ['HIGH', 'MEDIUM', 'LOW'];
+            const labels: any = { HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
             const colors: any = { HIGH: '#ff4d4f', MEDIUM: '#f1c40f', LOW: 'var(--text-secondary)' };
             priorityOrder.forEach(p => {
-                groups.push({ key: p, label: p, color: colors[p], items: tasks.filter(t => t.priority === p) });
+                groups.push({ key: p, label: labels[p], color: colors[p], items: tasks.filter(t => t.priority === p) });
             });
         } else if (groupBy === 'ASSIGNEE') {
             users.forEach(u => {
-                groups.push({ key: u.id, label: u.name, color: '#007aff', items: tasks.filter(t => t.assigneeId === u.id), photo: u.photo });
+                groups.push({ key: u.id, label: u.name, color: '#007aff', items: tasks.filter(t => t.assignees?.some((a: any) => a.id === u.id)), photo: u.photo });
             });
-            groups.push({ key: 'unassigned', label: 'Unassigned', color: 'var(--text-secondary)', items: tasks.filter(t => !t.assigneeId) });
+            groups.push({ key: 'unassigned', label: 'Unassigned', color: 'var(--text-secondary)', items: tasks.filter(t => !t.assignees || t.assignees.length === 0) });
         }
         return groups;
     }, [tasks, groupBy, users]);
@@ -214,33 +270,22 @@ export default function TaskTimelineView({
     const handleDrop = async (e: React.DragEvent, dayOffset: number) => {
         e.preventDefault();
         const taskId = e.dataTransfer.getData('taskId');
+        setDraggedTaskId(null);
         if (!taskId) return;
 
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        const newEnd = addDays(startDate, dayOffset);
+        const dur = daysBetween(new Date(task.startDate || task.createdAt), new Date(task.dueDate || task.createdAt));
+        const newStart = addDays(startDate, dayOffset);
+        const newEnd = addDays(newStart, dur);
 
-        // Optimistic update
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, dueDate: newEnd } : t));
-        if (onUpdate) {
-            onUpdate({ id: taskId, dueDate: newEnd });
-        }
-
-        startTransition(async () => {
-            try {
-                await updateTaskDueDate(taskId, newEnd);
-            } catch (err: any) {
-                setTasks(initialTasks);
-                alert(err.message || 'Failed to update date');
-            }
-        });
+        commitTaskChange(taskId, newStart, newEnd);
     };
 
     const exactDaysFromStart = (new Date().getTime() - startDate.getTime()) / 86400000;
-    const LEFT_PANEL = 300;
-    const HEADER_HEIGHT = 68;
-    const ROW_HEIGHT = 44;
+
+    useTimelinePan(gridRef, !resizingTaskId && !draggedTaskId);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.02)' }}>
@@ -273,7 +318,7 @@ export default function TaskTimelineView({
                 </div>
             </div>
 
-            <div className="custom-scrollbar" style={{ flex: 1, overflow: 'auto', position: 'relative' }} ref={gridRef}>
+            <div className="custom-scrollbar" style={{ flex: 1, overflow: 'auto', position: 'relative', cursor: 'grab' }} ref={gridRef}>
                 <div style={{ minWidth: LEFT_PANEL + totalDays * colW }}>
                     <TimelineHeader topRowItems={topRowItems} bottomRowItems={bottomRowItems} zoom={zoom} leftPanelWidth={LEFT_PANEL} />
 
@@ -296,7 +341,7 @@ export default function TaskTimelineView({
                                 <div onClick={() => setCollapsed(prev => ({ ...prev, [group.key]: !isCollapsed }))} style={{ display: 'flex', height: 36, alignItems: 'center', background: 'rgba(55,53,47,0.02)', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', position: 'sticky', left: 0, zIndex: 5 }}>
                                     <div style={{ width: LEFT_PANEL, display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px', borderRight: '1px solid var(--border-color)', background: 'var(--bg-color)', boxShadow: '2px 0 8px rgba(0,0,0,0.01)' }}>
                                         {isCollapsed ? <ChevronRight size={14} color="var(--text-secondary)" /> : <ChevronDown size={14} color="var(--text-secondary)" />}
-                                        {group.photo && <img src={group.photo} style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid var(--border-color)' }} />}
+                                        {group.photo && <img src={group.photo} alt={group.label} style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid var(--border-color)' }} />}
                                         <span style={{ fontSize: 13, fontWeight: 700, color: group.color }}>{group.label}</span>
                                         <span style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'var(--sidebar-bg)', padding: '2px 6px', borderRadius: 8 }}>{group.items.length}</span>
                                     </div>
@@ -304,31 +349,32 @@ export default function TaskTimelineView({
                                 </div>
 
                                 {!isCollapsed && group.items.map((task: any) => {
-                                    const created = new Date(task.createdAt);
-                                    const due = task.dueDate ? new Date(task.dueDate) : created;
+                                    const created = new Date(task.startDate || task.createdAt);
+                                    const due = new Date(task.dueDate || task.startDate || task.createdAt);
                                     const startOffset = daysBetween(startDate, created);
                                     const endOffset = daysBetween(startDate, due);
 
                                     const barLeft = Math.max(0, startOffset);
                                     const barWidth = Math.max(1, endOffset - startOffset + 1);
-                                    const canEdit = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
-
+                                    const canEditTask = canEdit(task);
                                     const colors = STATUS_COLORS[task.status] || STATUS_COLORS.TODO;
 
                                     return (
                                         <div key={task.id} className="timeline-row" style={{ display: 'flex', height: ROW_HEIGHT, borderBottom: '1px solid var(--border-color)', position: 'relative', transition: 'background-color 0.15s' }}>
                                             <style>{`.timeline-row:hover { background-color: rgba(0,0,0,0.01); } .timeline-row:hover .title-cell { background-color: var(--hover-bg) !important; }`}</style>
 
-                                            {/* Left Panel: Task Detail */}
-                                            <div className="title-cell" style={{ width: LEFT_PANEL, flexShrink: 0, borderRight: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 20px', position: 'sticky', left: 0, background: 'var(--bg-color)', zIndex: 4, cursor: 'pointer', transition: 'background-color 0.15s', boxShadow: '2px 0 8px rgba(0,0,0,0.01)' }} onClick={() => onDetail(task)}>
+                                            <div data-nopan="true" className="title-cell" style={{ width: LEFT_PANEL, flexShrink: 0, borderRight: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 20px', position: 'sticky', left: 0, background: 'var(--bg-color)', zIndex: 4, cursor: 'pointer', transition: 'background-color 0.15s', boxShadow: '2px 0 8px rgba(0,0,0,0.01)' }} onClick={() => onDetail(task)}>
                                                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                                                     <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{task.title}</span>
-                                                    {(task.assignee || task.priority) && (
+                                                    {((task.assignees && task.assignees.length > 0) || task.priority) && (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                                            {task.assignee && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                                    {task.assignee.photo ? <img src={task.assignee.photo} style={{ width: 14, height: 14, borderRadius: '50%' }} /> : <UserIcon size={12} color="var(--text-secondary)" />}
-                                                                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{task.assignee.name}</span>
+                                                            {task.assignees && task.assignees.length > 0 && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: -6 }}>
+                                                                    {task.assignees.map((a: any, idx: number) => (
+                                                                        <div key={a.id} title={a.name} style={{ display: 'flex', alignItems: 'center', zIndex: task.assignees.length - idx, position: 'relative' }}>
+                                                                            {a.photo ? <img src={a.photo} alt={a.name} style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--bg-color)' }} /> : <UserIcon size={12} color="var(--text-secondary)" />}
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             )}
                                                             {task.priority === 'HIGH' && <span style={{ fontSize: 10, color: '#ff4d4f', fontWeight: 800 }}>HIGH PRIORITY</span>}
@@ -337,38 +383,54 @@ export default function TaskTimelineView({
                                                 </div>
                                             </div>
 
-                                            {/* Timeline Area */}
                                             <div style={{ flex: 1, position: 'relative' }} onDragOver={e => e.preventDefault()} onDrop={e => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const offset = Math.floor((e.clientX - rect.left) / colW);
                                                 handleDrop(e, offset);
                                             }}>
                                                 <div
-                                                    draggable={canEdit}
-                                                    onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
-                                                    onClick={() => onDetail(task)}
+                                                    draggable={canEditTask && !resizingTaskId}
+                                                    onDragStart={e => {
+                                                        e.dataTransfer.setData('taskId', task.id);
+                                                        setDraggedTaskId(task.id);
+                                                    }}
+                                                    onDragEnd={() => setDraggedTaskId(null)}
+                                                    onClick={() => !resizingTaskId && onDetail(task)}
                                                     style={{
                                                         position: 'absolute', left: barLeft * colW + 4, width: Math.max(24, barWidth * colW - 8),
                                                         top: '50%', transform: 'translateY(-50%)', height: 26, borderRadius: 8,
-                                                        background: task.status === 'DONE' ? 'rgba(46, 204, 113, 0.08)' : (canEdit ? colors.bg : 'var(--sidebar-bg)'),
+                                                        background: task.status === 'DONE' ? 'rgba(46, 204, 113, 0.08)' : (canEditTask ? colors.bg : 'var(--sidebar-bg)'),
                                                         border: `1px solid ${task.status === 'DONE' ? 'rgba(46, 204, 113, 0.3)' : colors.border}`,
                                                         borderLeft: `4px solid ${task.status === 'DONE' ? '#27ae60' : colors.text}`,
                                                         color: task.status === 'DONE' ? '#27ae60' : colors.text,
                                                         fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', padding: '0 10px',
-                                                        cursor: canEdit ? 'grab' : 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'all 0.15s ease',
-                                                        opacity: task.status === 'DONE' ? 0.6 : 1, textDecoration: task.status === 'DONE' ? 'line-through' : 'none'
-                                                    }}
-                                                    onMouseEnter={e => {
-                                                        e.currentTarget.style.transform = 'translateY(-50%) scale(1.02)';
-                                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                                                    }}
-                                                    onMouseLeave={e => {
-                                                        e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
-                                                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.02)';
+                                                        cursor: canEditTask ? (draggedTaskId === task.id ? 'grabbing' : 'grab') : 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.02)', transition: 'transform 0.15s ease',
+                                                        opacity: task.status === 'DONE' ? 0.6 : 1, textDecoration: task.status === 'DONE' ? 'line-through' : 'none',
+                                                        zIndex: resizingTaskId === task.id ? 100 : 1
                                                     }}
                                                 >
-                                                    {task.title}
+                                                    {canEditTask && (
+                                                        <div
+                                                            onMouseDown={e => {
+                                                                e.stopPropagation();
+                                                                setResizingTaskId(task.id);
+                                                                resizeRef.current = { id: task.id, side: 'left', origStart: created, origEnd: due };
+                                                            }}
+                                                            style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10 }}
+                                                        />
+                                                    )}
+                                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none' }}>{task.title}</span>
+                                                    {canEditTask && (
+                                                        <div
+                                                            onMouseDown={e => {
+                                                                e.stopPropagation();
+                                                                setResizingTaskId(task.id);
+                                                                resizeRef.current = { id: task.id, side: 'right', origStart: created, origEnd: due };
+                                                            }}
+                                                            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10 }}
+                                                        />
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

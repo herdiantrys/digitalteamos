@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { updateTaskStatus, deleteTask } from '../../../lib/task-actions';
 import { Calendar as CalendarIcon, Filter, Search, Plus, List as ListIcon, Columns, Clock, ChevronDown, CheckSquare, Layers, User, Trash2, Check, ExternalLink, CalendarDays, KanbanSquare, Table as TableIcon, GitCommit, CheckCircle2, Circle, Trello, LayoutList, Table2, Timer, X } from 'lucide-react';
 import NewTaskModal from './NewTaskModal';
@@ -24,6 +25,7 @@ export default function KanbanBoardClient({
     relations: Relation[];
     currentUser: any;
 }) {
+    const router = useRouter();
     const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST' | 'TABLE' | 'CALENDAR' | 'TIMELINE'>('KANBAN');
     const [filter, setFilter] = useState<'ALL' | 'MINE'>(() => currentUser.role === 'STAFF' ? 'MINE' : 'ALL');
     const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'CUSTOM'>(() => currentUser.role === 'STAFF' ? 'TODAY' : 'ALL');
@@ -40,19 +42,23 @@ export default function KanbanBoardClient({
     const [tasks, setTasks] = useState(initialTasks);
     const [isPending, startTransition] = useTransition();
 
-    // Merge task edits from modal back into local state
+    // Merge task edits from modal back into local state (optimistic)
     const handleTaskUpdate = (updatedTask: any) => {
         setTasks(prev => prev.map(t => t.id === updatedTask.id ? { ...t, ...updatedTask } : t));
         setSelectedTask((prev: any) => prev?.id === updatedTask.id ? { ...prev, ...updatedTask } : prev);
+        // Sync server state in background (no visible reload)
+        router.refresh();
     };
 
     const handleTaskCreated = (newTask: any) => {
         setTasks(prev => [newTask, ...prev]);
+        router.refresh();
     };
 
     const handleDeleteTask = async (taskId: string) => {
         setTasks(prev => prev.filter(t => t.id !== taskId));
         if (selectedTask?.id === taskId) setSelectedTask(null);
+        router.refresh();
     };
 
     const COLUMNS = [
@@ -66,7 +72,7 @@ export default function KanbanBoardClient({
 
     const visibleTasks = tasks.filter(t => {
         // 1. Assignee Filter
-        if (filter !== 'ALL' && t.assigneeId !== currentUser.id) return false;
+        if (filter !== 'ALL' && !t.assignees?.some((a: any) => a.id === currentUser.id)) return false;
 
         // 2. Date Filter
         if (dateFilter === 'ALL') return true;
@@ -118,6 +124,8 @@ export default function KanbanBoardClient({
         startTransition(async () => {
             try {
                 await updateTaskStatus(taskId, statusId);
+                // Sync server state after successful save
+                router.refresh();
             } catch (err: any) {
                 setTasks(initialTasks);
                 console.error("Failed to update status", err);
@@ -332,7 +340,7 @@ export default function KanbanBoardClient({
                                     <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>No tasks found</td>
                                 </tr>
                             ) : visibleTasks.map(task => {
-                                const canEditList = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
+                                const canEditList = currentUser.role === 'ADMIN' || task.assignees?.some((a: any) => a.id === currentUser.id);
                                 return (
                                     <tr
                                         key={task.id}
@@ -346,12 +354,13 @@ export default function KanbanBoardClient({
                                             <StatusBadge status={task.status} />
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            {task.assignee ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--border-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
-                                                        {task.assignee.photo ? <img src={task.assignee.photo} alt={task.assignee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : task.assignee.name.substring(0, 2).toUpperCase()}
-                                                    </div>
-                                                    <span>{task.assignee.name}</span>
+                                            {task.assignees && task.assignees.length > 0 ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: -8 }}>
+                                                    {task.assignees.map((a: any, idx: number) => (
+                                                        <div key={a.id} title={a.name} style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--border-color)', border: '2px solid var(--bg-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, zIndex: task.assignees.length - idx, position: 'relative', marginLeft: idx > 0 ? -8 : 0 }}>
+                                                            {a.photo ? <img src={a.photo} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : a.name.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ) : <span style={{ color: 'var(--text-secondary)' }}>Unassigned</span>}
                                         </td>
@@ -362,10 +371,14 @@ export default function KanbanBoardClient({
                                             <PriorityBadge priority={task.priority} />
                                         </td>
                                         <td style={{ padding: '16px' }}>
-                                            {task.relatedItem ? (
-                                                <span style={{ fontSize: 12, background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                    {task.relatedItem.database?.icon || '📄'} {task.relatedItem.title}
-                                                </span>
+                                            {task.relatedItems && task.relatedItems.length > 0 ? (
+                                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                    {task.relatedItems.map((rItem: any) => (
+                                                        <span key={rItem.id} style={{ fontSize: 12, background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                            {rItem.database?.icon || '📄'} {rItem.title}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             ) : '-'}
                                         </td>
                                     </tr>
@@ -390,17 +403,15 @@ export default function KanbanBoardClient({
 
             {/* Calendar View */}
             {viewMode === 'CALENDAR' && (
-                <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                     <TaskCalendarView
                         tasks={visibleTasks}
                         currentUser={currentUser}
                         onDetail={setSelectedTask}
                         onUpdate={handleTaskUpdate}
                         onNewTaskWithDate={(dateStr) => {
-                            // Can pre-fill date if NewTaskModal supports it, fallback to default behavior first
                             setDefaultStatusForNew('TODO');
                             setIsNewModalOpen(true);
-                            // We would need to pass date into NewTaskModal if we want pre-fill
                         }}
                     />
                 </div>
@@ -446,7 +457,7 @@ export default function KanbanBoardClient({
 
 function TaskCard({ task, onDragStart, onDragEnd, currentUser, onDetail, onDelete, startTransition }: any) {
     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE' && task.status !== 'CANCELED';
-    const canEdit = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
+    const canEdit = currentUser.role === 'ADMIN' || task.assignees?.some((a: any) => a.id === currentUser.id);
 
     // Build the date display
     let dateDisplay = 'No date';
@@ -528,17 +539,21 @@ function TaskCard({ task, onDragStart, onDragEnd, currentUser, onDetail, onDelet
                 {task.title}
             </div>
 
-            {task.relatedItem && (
-                <div style={{
-                    fontSize: 11, color: 'var(--text-secondary)',
-                    display: 'flex', gap: 5, alignItems: 'center',
-                    background: 'var(--sidebar-bg)', padding: '4px 9px', borderRadius: 7,
-                    width: 'fit-content', border: '1px solid var(--border-color)'
-                }}>
-                    <span style={{ display: 'flex', flexShrink: 0 }}>
-                        {task.relatedItem.database?.icon ? <LucideIcon name={task.relatedItem.database.icon as any} size={11} color={task.relatedItem.database.iconColor || 'var(--text-primary)'} /> : '📄'}
-                    </span>
-                    <span style={{ maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{task.relatedItem.title}</span>
+            {task.relatedItems && task.relatedItems.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {task.relatedItems.map((rItem: any) => (
+                        <div key={rItem.id} style={{
+                            fontSize: 11, color: 'var(--text-secondary)',
+                            display: 'flex', gap: 5, alignItems: 'center',
+                            background: 'var(--sidebar-bg)', padding: '4px 9px', borderRadius: 7,
+                            width: 'fit-content', border: '1px solid var(--border-color)'
+                        }}>
+                            <span style={{ display: 'flex', flexShrink: 0 }}>
+                                {rItem.database?.icon ? <LucideIcon name={rItem.database.icon as any} size={11} color={rItem.database.iconColor || 'var(--text-primary)'} /> : '📄'}
+                            </span>
+                            <span style={{ maxWidth: 160, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{rItem.title}</span>
+                        </div>
+                    ))}
                 </div>
             )}
 
@@ -555,9 +570,13 @@ function TaskCard({ task, onDragStart, onDragEnd, currentUser, onDetail, onDelet
                     <span>{dateDisplay}</span>
                 </div>
 
-                {task.assignee ? (
-                    <div title={`Assigned to ${task.assignee.name}`} style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--sidebar-bg)', border: '2px solid var(--border-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
-                        {task.assignee.photo ? <img src={task.assignee.photo} alt={task.assignee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : task.assignee.name.substring(0, 2).toUpperCase()}
+                {task.assignees && task.assignees.length > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                        {task.assignees.map((a: any, idx: number) => (
+                            <div key={a.id} title={`Assigned to ${a.name}`} style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--sidebar-bg)', border: '2px solid var(--bg-color)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, zIndex: task.assignees.length - idx, position: 'relative', marginLeft: idx > 0 ? -8 : 0 }}>
+                                {a.photo ? <img src={a.photo} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : a.name.substring(0, 2).toUpperCase()}
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     <div title="Unassigned" style={{ width: 26, height: 26, borderRadius: '50%', background: 'transparent', border: '1.5px dashed var(--border-color)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600 }}>?</div>

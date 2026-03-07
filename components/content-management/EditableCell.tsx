@@ -12,6 +12,7 @@ export default function EditableCell({
     initialValue,
     type,
     optionsRaw,
+    userOptionsRaw,
     propertyId,
     colorConfigRaw,
     disabled,
@@ -21,6 +22,7 @@ export default function EditableCell({
     initialValue: any,
     type: string,
     optionsRaw: string | null,
+    userOptionsRaw?: string,
     propertyId?: string,
     colorConfigRaw?: string | null,
     disabled?: boolean,
@@ -110,24 +112,30 @@ export default function EditableCell({
 
     // ── PERSON ────────────────────────────────────────────────────────────────
     if (type === 'PERSON') {
-        let userOptions: { id: string; name: string }[] = [];
+        let userOptions: { id: string; name: string, photo?: string }[] = [];
         try {
+            // First priority: options specific to this property (if any)
             const parsed = optionsRaw ? JSON.parse(optionsRaw) : [];
             userOptions = Array.isArray(parsed) ? parsed : [];
+
+            // Second priority: If property options are empty, use global userOptionsRaw
+            if (userOptions.length === 0 && userOptionsRaw) {
+                const globalParsed = JSON.parse(userOptionsRaw);
+                userOptions = Array.isArray(globalParsed) ? globalParsed : [];
+            }
         } catch { userOptions = []; }
 
-        const valStr = value ? String(value) : '';
+        const currentSelected = value ? String(value).split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 
+        // If we have any user options, use BadgeDropdown for selection & resolving
         if (userOptions.length > 0) {
-            const currentSelected = valStr ? [valStr] : [];
-
             return (
                 <div style={{ opacity: isSaving ? 0.5 : 1 }}>
                     <BadgeDropdown
                         optionsRaw={JSON.stringify(userOptions)}
                         initialValues={currentSelected}
-                        multiple={false}
-                        onChange={(newSel) => handleSave(newSel[0] || '')}
+                        multiple={true}
+                        onChange={(newSel) => handleSave(newSel.length > 0 ? newSel.join(', ') : '')}
                         placeholder="-"
                         propertyId={propertyId}
                         colorConfigRaw={colorConfigRaw}
@@ -137,11 +145,11 @@ export default function EditableCell({
             );
         }
 
-        // No user options — plain text display
+        // Fallback: Just show the IDs if no user data found
         return (
             <input
                 type="text"
-                value={valStr}
+                value={value ? String(value) : ''}
                 onChange={(e) => setValue(e.target.value)}
                 onBlur={() => handleSave(value)}
                 placeholder="-"

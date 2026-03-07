@@ -23,7 +23,7 @@ model User {
   workspaceMembers  WorkspaceMember[] // Workspaces the user belongs to
 
   contents      Content[] @relation("ContentAuthor")
-  assignedTasks Task[]    @relation("TaskAssignee")
+  assignedTasks Task[]    @relation("TaskAssignees") // Changed relation name
   createdTasks  Task[]    @relation("TaskCreator")
   
   contentHistory ContentHistory[] @relation("HistoryChanger")
@@ -92,7 +92,7 @@ model Content {
   orderIdx     Int     @default(0) // Used to sort items within the same calendar date
 
   history ContentHistory[]
-  tasks   Task[]
+  tasks   Task[] @relation("TaskRelatedItems")
 
   authorId String?
   author   User?   @relation("ContentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
@@ -169,16 +169,14 @@ model Task {
   dueDate     DateTime?
 
   // Who the task is assigned to
-  assigneeId String?
-  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignees     User[]    @relation("TaskAssignees") // Changed to multiple assignees
 
   // Who created the task
   creatorId String
   creator   User   @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
 
-  // Link to a specific content/database item
-  relatedItemId String?
-  relatedItem   Content? @relation(fields: [relatedItemId], references: [id], onDelete: SetNull)
+  // Link to specific content/database items
+  relatedItems  Content[] @relation("TaskRelatedItems")
 
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

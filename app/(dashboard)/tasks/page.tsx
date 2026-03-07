@@ -20,16 +20,16 @@ export default async function TasksPage() {
     // For now we just fetch everything, but in a massive workspace this should be a search endpoint.
     const relations = await prisma.content.findMany({
         where: { workspaceId },
-        select: { id: true, title: true, database: { select: { name: true, icon: true, iconColor: true } } },
+        select: { id: true, title: true, databaseId: true, database: { select: { name: true, icon: true, iconColor: true } } },
         orderBy: { createdAt: 'desc' }
     });
 
     const tasks = await prisma.task.findMany({
         where: { workspaceId },
         include: {
-            assignee: { select: { id: true, name: true, photo: true } },
+            assignees: { select: { id: true, name: true, photo: true } },
             creator: { select: { id: true, name: true, photo: true } },
-            relatedItem: { select: { id: true, title: true, database: { select: { name: true, icon: true, iconColor: true } } } }
+            relatedItems: { select: { id: true, title: true, database: { select: { name: true, icon: true, iconColor: true } } } }
         },
         orderBy: { updatedAt: 'desc' }
     });

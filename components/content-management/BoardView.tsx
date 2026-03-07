@@ -47,10 +47,12 @@ export default function BoardView({
     const activeProp = properties.find(p => p.id === groupByPropId);
     if (!activeProp) return null;
 
-    const optionsRaw = activeProp.options ? JSON.parse(activeProp.options) : (activeProp.type === 'PERSON' ? JSON.parse(userOptionsRaw) : []);
-    const options = optionsRaw.map((opt: any) => typeof opt === 'string' ? opt : opt.name || opt.label);
+    const allUsers: any[] = activeProp.type === 'PERSON' ? JSON.parse(userOptionsRaw || '[]') : [];
 
-    // Create columns: one for each option, plus an 'Uncategorized' column
+    const optionsRaw = activeProp.options ? JSON.parse(activeProp.options) : (activeProp.type === 'PERSON' ? allUsers : []);
+    const options = optionsRaw.map((opt: any) => typeof opt === 'string' ? opt : opt.id || opt.name || opt.label);
+
+    // Create columns: one for each option ID, plus an 'Uncategorized' column
     const columns: Record<string, any[]> = { 'Uncategorized': [] };
     options.forEach((opt: string) => columns[opt] = []);
 
@@ -81,13 +83,25 @@ export default function BoardView({
         <div>
 
             <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 16 }}>
-                {Object.keys(columns).map(columnName => {
-                    const colItems = columns[columnName];
+                {Object.keys(columns).map(columnId => {
+                    const colItems = columns[columnId];
                     // Hide Uncategorized if empty
-                    if (columnName === 'Uncategorized' && colItems.length === 0) return null;
+                    if (columnId === 'Uncategorized' && colItems.length === 0) return null;
+
+                    // Resolve display name and photo for PERSON
+                    let displayName = columnId;
+                    let photoUrl = null;
+
+                    if (activeProp.type === 'PERSON') {
+                        const user = allUsers.find(u => u.id === columnId || u.name === columnId);
+                        if (user) {
+                            displayName = user.name;
+                            photoUrl = user.photo;
+                        }
+                    }
 
                     return (
-                        <div key={columnName} style={{
+                        <div key={columnId} style={{
                             minWidth: 280,
                             maxWidth: 320,
                             flex: 1,
@@ -99,7 +113,12 @@ export default function BoardView({
                             gap: 12
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-                                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{columnName}</h4>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {photoUrl && (
+                                        <img src={photoUrl} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }} />
+                                    )}
+                                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{displayName}</h4>
+                                </div>
                                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{colItems.length}</span>
                             </div>
 
@@ -160,6 +179,7 @@ export default function BoardView({
                                                                 initialValue={cd[p.id]}
                                                                 type={p.type}
                                                                 optionsRaw={p.options}
+                                                                userOptionsRaw={userOptionsRaw}
                                                                 propertyId={p.id}
                                                                 colorConfigRaw={(p as any).colorConfig}
                                                                 disabled={(() => {

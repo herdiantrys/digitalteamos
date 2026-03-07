@@ -125,7 +125,26 @@ export default function ContentDetailModal({
             const propDef = properties.find(p => p.name.toLowerCase() === key);
             if (propDef) {
                 const val = customFields[propDef.id];
-                return val ? String(val) : '';
+                if (!val) return '';
+
+                if (propDef.type === 'PERSON') {
+                    try {
+                        const allUsers: any[] = JSON.parse(userOptionsRaw || '[]');
+                        const ids = String(val).split(',').map(s => s.trim()).filter(Boolean);
+                        const results = ids.map(id => {
+                            const user = allUsers.find(u => u.id === id || u.name === id);
+                            if (user) {
+                                return user.name;
+                            }
+                            return id;
+                        });
+                        return results.join(', ');
+                    } catch {
+                        return String(val);
+                    }
+                }
+
+                return String(val);
             }
             return match; // leave untouched if not found
         });

@@ -870,6 +870,7 @@ export default function TableView({
                                                                 propId={p.id}
                                                                 type={p.type}
                                                                 optionsRaw={p.type === 'PERSON' ? userOptionsRaw : p.options}
+                                                                userOptionsRaw={userOptionsRaw}
                                                                 initialValue={customData[p.id]}
                                                                 propertyId={p.id}
                                                                 colorConfigRaw={(p as any).colorConfig}

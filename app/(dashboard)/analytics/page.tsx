@@ -41,7 +41,7 @@ async function buildPeriodBuckets(
         prisma.task.findMany({
             where: { workspaceId, status: 'DONE', updatedAt: { gte: from } },
             include: {
-                relatedItem: {
+                relatedItems: {
                     include: { database: { include: { properties: true } } }
                 }
             }
@@ -69,16 +69,17 @@ async function buildPeriodBuckets(
 
 function resolveTaskDate(task: any): Date {
     const updatedAt = new Date(task.updatedAt);
-    if (!task.relatedItem || !task.relatedItem.customFields || !task.relatedItem.database?.properties) {
+    const relatedItem = task.relatedItems?.[0];
+    if (!relatedItem || !relatedItem.customFields || !relatedItem.database?.properties) {
         return updatedAt;
     }
 
     try {
-        const properties = task.relatedItem.database.properties;
+        const properties = relatedItem.database.properties;
         const dateProp = properties.find((p: any) => p.type === 'DATE');
         if (!dateProp) return updatedAt;
 
-        const customFields = JSON.parse(task.relatedItem.customFields);
+        const customFields = JSON.parse(relatedItem.customFields);
         const dateVal = customFields[dateProp.id];
         if (!dateVal) return updatedAt;
 
@@ -100,9 +101,9 @@ async function getMemberStats(workspaceId: string, members: any[], startDate: Da
     const stats = await Promise.all(members.map(async m => {
         // Fetch all done tasks for this member to filter by resolved date locally
         const doneTasks = await prisma.task.findMany({
-            where: { workspaceId, assigneeId: m.userId, status: 'DONE' },
+            where: { workspaceId, assignees: { some: { id: m.userId } }, status: 'DONE' },
             include: {
-                relatedItem: {
+                relatedItems: {
                     include: { database: { include: { properties: true } } }
                 }
             }
@@ -113,15 +114,15 @@ async function getMemberStats(workspaceId: string, members: any[], startDate: Da
             : doneTasks;
 
         const [tasksInProgress, tasksTotal] = await Promise.all([
-            prisma.task.count({ where: { workspaceId, assigneeId: m.userId, status: { in: ['IN_PROGRESS', 'TODO'] }, createdAt: startDate ? { gte: startDate } : undefined } }),
-            prisma.task.count({ where: { workspaceId, assigneeId: m.userId, createdAt: startDate ? { gte: startDate } : undefined } }),
+            prisma.task.count({ where: { workspaceId, assignees: { some: { id: m.userId } }, status: { in: ['IN_PROGRESS', 'TODO'] }, createdAt: startDate ? { gte: startDate } : undefined } }),
+            prisma.task.count({ where: { workspaceId, assignees: { some: { id: m.userId } }, createdAt: startDate ? { gte: startDate } : undefined } }),
         ]);
 
         const linkedTasks = await prisma.task.findMany({
-            where: { workspaceId, assigneeId: m.userId, relatedItemId: { not: null }, createdAt: startDate ? { gte: startDate } : undefined },
-            select: { relatedItemId: true },
+            where: { workspaceId, assignees: { some: { id: m.userId } }, relatedItems: { some: {} }, createdAt: startDate ? { gte: startDate } : undefined },
+            include: { relatedItems: { select: { id: true } } },
         });
-        const uniqueContentIds = [...new Set(linkedTasks.map(t => t.relatedItemId).filter(Boolean))];
+        const uniqueContentIds = [...new Set(linkedTasks.flatMap(t => t.relatedItems.map((r: any) => r.id)))];
 
         return {
             id: m.userId,
@@ -146,8 +147,8 @@ async function getCompletedTasksInPeriod(workspaceId: string, startDate: Date | 
         },
         orderBy: { updatedAt: 'desc' },
         include: {
-            assignee: { select: { id: true, name: true, photo: true } },
-            relatedItem: {
+            assignees: { select: { id: true, name: true, photo: true } },
+            relatedItems: {
                 include: {
                     database: {
                         include: {
@@ -159,10 +160,29 @@ async function getCompletedTasksInPeriod(workspaceId: string, startDate: Date | 
         }
     });
 
-    const withResolved = tasks.map(t => ({
-        ...t,
-        resolvedDate: resolveTaskDate(t).toISOString()
-    }));
+    const withResolved = tasks.map(t => {
+        return {
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            updatedAt: t.updatedAt.toISOString(),
+            resolvedDate: resolveTaskDate(t).toISOString(),
+            assignees: t.assignees.map(a => ({
+                id: a.id,
+                name: a.name,
+                photo: a.photo
+            })),
+            relatedItems: (t as any).relatedItems.map((ri: any) => ({
+                id: ri.id,
+                title: ri.title,
+                database: ri.database ? {
+                    name: ri.database.name,
+                    icon: ri.database.icon,
+                    iconColor: ri.database.iconColor
+                } : null
+            }))
+        };
+    });
 
     if (!startDate) return withResolved;
 

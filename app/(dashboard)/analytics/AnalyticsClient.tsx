@@ -28,19 +28,19 @@ type CompletedTask = {
     title: string;
     updatedAt: string;
     resolvedDate?: string;
-    assignee: {
+    assignees: {
         id: string;
         name: string;
         photo: string | null;
-    } | null;
-    relatedItem: {
+    }[];
+    relatedItems: {
         title: string;
         database: {
             name: string;
             icon: string | null;
             iconColor: string | null;
         } | null;
-    } | null;
+    }[];
 };
 
 type AnalyticsData = {
@@ -518,54 +518,85 @@ export default function AnalyticsClient({ data, workspaceName }: { data: Analyti
                         <table style={{ minWidth: '100%', width: '100%', borderCollapse: 'collapse', fontSize: 13 }} className="print-task-table">
                             <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                                    <th style={{ padding: '16px 12px', fontWeight: 600 }}>Task</th>
-                                    <th style={{ padding: '16px 12px', fontWeight: 600, width: 250 }}>Related Content</th>
-                                    <th style={{ padding: '16px 12px', fontWeight: 600, width: 200 }}>Completed By</th>
+                                    <th style={{ padding: '16px 12px', fontWeight: 600, width: 280 }}>Task</th>
+                                    <th style={{ padding: '16px 12px', fontWeight: 600, width: 300 }}>Related Content</th>
+                                    <th style={{ padding: '16px 12px', fontWeight: 600, width: 200 }}>Assignee</th>
                                     <th style={{ padding: '16px 12px', fontWeight: 600, width: 150 }}>Date Completed</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {completedTasks.map((task) => (
                                     <tr key={task.id} className="analytics-member-row" style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                                        <td style={{ padding: '16px 12px' }}>
-                                            <div className="print-dark-text" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{task.title}</div>
+                                        <td style={{ padding: '16px 12px', verticalAlign: 'top' }}>
+                                            <div className="print-dark-text" style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word' }}>{task.title}</div>
                                             <div style={{ fontSize: 11, color: '#2ecc71', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                                 <CheckCircle2 size={12} className="print-exact-bg" /> Done
                                             </div>
                                         </td>
-                                        <td style={{ padding: '16px 12px' }}>
-                                            {task.relatedItem ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <span className="print-exact-bg" style={{ fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, background: 'rgba(255,255,255,0.05)', borderRadius: 4 }}>
-                                                        {task.relatedItem.database?.icon ? <div dangerouslySetInnerHTML={{ __html: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${task.relatedItem.database.icon}</svg>` }} /> : '📄'}
-                                                    </span>
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span className="print-dark-text" style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 }}>{task.relatedItem.title}</span>
-                                                        {task.relatedItem.database?.name && (
-                                                            <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>in {task.relatedItem.database.name}</span>
-                                                        )}
-                                                    </div>
+                                        <td style={{ padding: '16px 12px', verticalAlign: 'top' }}>
+                                            {task.relatedItems && task.relatedItems.length > 0 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    {task.relatedItems.map((item, idx) => (
+                                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                            <span className="print-exact-bg" style={{ fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, background: 'rgba(255,255,255,0.05)', borderRadius: 4, flexShrink: 0 }}>
+                                                                {item.database?.icon ? <div dangerouslySetInnerHTML={{ __html: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.database.icon}</svg>` }} /> : '📄'}
+                                                            </span>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                                <span className="print-dark-text" style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+                                                                    {item.title}
+                                                                </span>
+                                                                {item.database?.name && (
+                                                                    <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>in {item.database.name}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             ) : (
                                                 <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: 12 }}>No relation</span>
                                             )}
                                         </td>
-                                        <td style={{ padding: '16px 12px' }}>
-                                            {task.assignee ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <div className="print-exact-bg" style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', fontSize: 10, fontWeight: 700 }}>
-                                                        {task.assignee.photo
-                                                            // eslint-disable-next-line @next/next/no-img-element
-                                                            ? <img src={task.assignee.photo} alt={task.assignee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                            : task.assignee.name.substring(0, 2).toUpperCase()}
-                                                    </div>
-                                                    <span className="print-dark-text" style={{ fontWeight: 600 }}>{task.assignee.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: 12 }}>Unassigned</span>
-                                            )}
+                                        <td style={{ padding: '16px 12px', verticalAlign: 'top' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                                                {task.assignees.length > 0 ? (
+                                                    task.assignees.map((assignee, idx) => (
+                                                        <div
+                                                            key={assignee.id}
+                                                            title={assignee.name}
+                                                            className="print-exact-bg"
+                                                            style={{
+                                                                width: 28,
+                                                                height: 28,
+                                                                borderRadius: '50%',
+                                                                background: 'var(--border-color)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                overflow: 'hidden',
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                border: '2px solid var(--bg-color)',
+                                                                marginLeft: idx > 0 ? -10 : 0,
+                                                                zIndex: 10 - idx,
+                                                                position: 'relative'
+                                                            }}
+                                                        >
+                                                            {assignee.photo
+                                                                ? <img src={assignee.photo} alt={assignee.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                : assignee.name.substring(0, 2).toUpperCase()}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: 12 }}>Unassigned</span>
+                                                )}
+                                                {task.assignees.length > 0 && (
+                                                    <span className="print-dark-text" style={{ fontWeight: 600, fontSize: 12, marginLeft: 4 }}>
+                                                        {task.assignees.length === 1 ? task.assignees[0].name : `${task.assignees.length} people`}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
-                                        <td style={{ padding: '16px 12px', color: 'var(--text-secondary)' }}>
+                                        <td style={{ padding: '16px 12px', verticalAlign: 'top', color: 'var(--text-secondary)' }}>
                                             {new Date(task.resolvedDate || task.updatedAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </td>
                                     </tr>

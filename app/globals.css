@@ -643,3 +643,26 @@ h1.page-title {
   vertical-align: middle;
   box-shadow: 0 0 8px rgba(255, 77, 79, 0.4);
 }
+
+/* Dashboard: Metric Card hover */
+.metric-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Dashboard: Content/Task row hover */
+.content-row-hover:hover {
+  background: rgba(55, 53, 47, 0.03);
+  cursor: default;
+}
+
+[data-theme='dark'] .content-row-hover:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Dashboard: Responsive 2-column grid → 1 column on small screens */
+@media (max-width: 900px) {
+  .dashboard-two-col {
+    grid-template-columns: 1fr !important;
+  }
+}

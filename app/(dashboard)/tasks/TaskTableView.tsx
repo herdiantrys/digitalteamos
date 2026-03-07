@@ -175,8 +175,8 @@ export default function TaskTableView({
                     case 'status': av = STATUS_ORDER.indexOf(a.status); bv = STATUS_ORDER.indexOf(b.status); break;
                     case 'priority': av = PRIORITY_ORDER.indexOf(a.priority); bv = PRIORITY_ORDER.indexOf(b.priority); break;
                     case 'dueDate': av = a.dueDate ? new Date(a.dueDate).getTime() : 0; bv = b.dueDate ? new Date(b.dueDate).getTime() : 0; break;
-                    case 'assignee': av = a.assignee?.name?.toLowerCase() ?? 'zzz'; bv = b.assignee?.name?.toLowerCase() ?? 'zzz'; break;
-                    case 'relation': av = a.relatedItem?.title?.toLowerCase() ?? 'zzz'; bv = b.relatedItem?.title?.toLowerCase() ?? 'zzz'; break;
+                    case 'assignee': av = a.assignees?.[0]?.name?.toLowerCase() ?? 'zzz'; bv = b.assignees?.[0]?.name?.toLowerCase() ?? 'zzz'; break;
+                    case 'relation': av = a.relatedItems?.[0]?.title?.toLowerCase() ?? 'zzz'; bv = b.relatedItems?.[0]?.title?.toLowerCase() ?? 'zzz'; break;
                 }
                 if (av < bv) return sortDir === 'asc' ? -1 : 1;
                 if (av > bv) return sortDir === 'asc' ? 1 : -1;
@@ -202,8 +202,13 @@ export default function TaskTableView({
             users.forEach(u => { buckets[u.id] = { label: u.name, color: '#007aff', items: [] }; });
             buckets['_none'] = { label: 'Unassigned', color: 'var(--text-secondary)', items: [] };
             filteredSorted.forEach(t => {
-                const key = t.assigneeId && buckets[t.assigneeId] ? t.assigneeId : '_none';
-                buckets[key].items.push(t);
+                if (t.assignees && t.assignees.length > 0) {
+                    t.assignees.forEach((a: any) => {
+                        if (buckets[a.id]) buckets[a.id].items.push(t);
+                    });
+                } else {
+                    buckets['_none'].items.push(t);
+                }
             });
         }
 
@@ -232,7 +237,7 @@ export default function TaskTableView({
     // ── Status cycle inline ──
     const cycleStatus = (e: React.MouseEvent, task: any) => {
         e.stopPropagation();
-        const canEdit = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
+        const canEdit = currentUser.role === 'ADMIN' || task.assignees?.some((a: any) => a.id === currentUser.id);
         if (!canEdit) return;
         const idx = STATUS_ORDER.indexOf(task.status);
         const next = STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
@@ -417,7 +422,7 @@ export default function TaskTableView({
                                 {!collapsed[group.key] && group.items.map((task: any, rowIdx: number) => {
                                     const isSelected = selectedIds.has(task.id);
                                     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE' && task.status !== 'CANCELED';
-                                    const canEdit = currentUser.role === 'ADMIN' || task.assigneeId === currentUser.id;
+                                    const canEdit = currentUser.role === 'ADMIN' || task.assignees?.some((a: any) => a.id === currentUser.id);
 
                                     return (
                                         <tr
@@ -472,20 +477,30 @@ export default function TaskTableView({
 
                                             {/* Assignee */}
                                             <td style={{ padding: '12px 14px', width: colWidths.assignee }}>
-                                                <Avatar user={task.assignee} />
+                                                {task.assignees && task.assignees.length > 0 ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                        {task.assignees.map((a: any) => (
+                                                            <Avatar key={a.id} user={a} />
+                                                        ))}
+                                                    </div>
+                                                ) : <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>—</span>}
                                             </td>
 
                                             {/* Relation */}
                                             <td style={{ padding: '12px 14px', width: colWidths.relation }}>
-                                                {task.relatedItem ? (
-                                                    <span style={{
-                                                        fontSize: 11, background: 'var(--sidebar-bg)', padding: '4px 9px',
-                                                        borderRadius: 7, border: '1px solid var(--border-color)',
-                                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                                        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                                                    }}>
-                                                        {task.relatedItem.database?.icon || '📄'} {task.relatedItem.title}
-                                                    </span>
+                                                {task.relatedItems && task.relatedItems.length > 0 ? (
+                                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                        {task.relatedItems.map((rItem: any) => (
+                                                            <span key={rItem.id} style={{
+                                                                fontSize: 11, background: 'var(--sidebar-bg)', padding: '4px 9px',
+                                                                borderRadius: 7, border: '1px solid var(--border-color)',
+                                                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {rItem.database?.icon || '📄'} {rItem.title}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 ) : <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>—</span>}
                                             </td>
 

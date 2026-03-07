@@ -66,6 +66,11 @@ export default function ContentViewer({
         if (vParam && initialViews.some(v => v.id === vParam)) {
             setActiveViewId(vParam);
         }
+        // Auto-open a specific content detail if ?open=contentId is in the URL
+        const openParam = searchParams.get('open');
+        if (openParam) {
+            setSelectedContentId(openParam);
+        }
     }, []); // Only on mount
 
     // Update URL when activeViewId changes
@@ -272,7 +277,9 @@ export default function ContentViewer({
 
     // Extract unique values per property for filter dropdown
     const filterOptions = useMemo(() => {
-        const options: Record<string, string[]> = {};
+        const options: Record<string, any[]> = {};
+        const allUsers: any[] = JSON.parse(userOptionsRaw || '[]');
+
         properties.forEach(p => {
             if (['SELECT', 'MULTI_SELECT', 'STATUS', 'PERSON'].includes(p.type)) {
                 const values = new Set<string>();
@@ -281,11 +288,20 @@ export default function ContentViewer({
                     const val = data[p.id];
                     if (val) val.split(',').map((v: string) => v.trim()).forEach((v: string) => { if (v) values.add(v); });
                 });
-                options[p.id] = Array.from(values).sort();
+
+                if (p.type === 'PERSON') {
+                    // For PERSON, resolve IDs to objects
+                    options[p.id] = Array.from(values).map(v => {
+                        const user = allUsers.find(u => u.id === v || u.name === v);
+                        return user ? { id: user.id, name: user.name, photo: user.photo } : { id: v, name: v };
+                    }).sort((a, b) => a.name.localeCompare(b.name));
+                } else {
+                    options[p.id] = Array.from(values).sort();
+                }
             }
         });
         return options;
-    }, [contents, properties]);
+    }, [contents, properties, userOptionsRaw]);
 
     // Count how many unfiltered items match each option value (for count badges)
     const matchCounts = useMemo(() => {
@@ -293,7 +309,8 @@ export default function ContentViewer({
         properties.forEach(p => {
             if (!filterOptions[p.id]) return;
             counts[p.id] = {};
-            filterOptions[p.id].forEach(val => {
+            filterOptions[p.id].forEach(opt => {
+                const val = typeof opt === 'string' ? opt : opt.id;
                 counts[p.id][val] = contents.filter(c => {
                     const cd = c.customFields ? JSON.parse(c.customFields) : {};
                     const v = cd[p.id] ? String(cd[p.id]) : '';
@@ -567,7 +584,10 @@ export default function ContentViewer({
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                {filterOptions[p.id].map(val => {
+                                                {filterOptions[p.id].map(opt => {
+                                                    const val = typeof opt === 'string' ? opt : opt.id;
+                                                    const label = typeof opt === 'string' ? opt : opt.name;
+                                                    const photo = typeof opt === 'string' ? null : opt.photo;
                                                     const isActive = propFilters.includes(val);
                                                     const c = getBadgeColorObj(val, colorConfig);
                                                     const count = matchCounts[p.id]?.[val] ?? 0;
@@ -577,7 +597,7 @@ export default function ContentViewer({
                                                             onClick={() => toggleFilter(p.id, val)}
                                                             style={{
                                                                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                                                                padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                                                                padding: photo ? '2px 10px 2px 2px' : '4px 10px', borderRadius: 20, cursor: 'pointer',
                                                                 fontSize: 12, fontWeight: 600,
                                                                 background: isActive ? c.bg : 'var(--sidebar-bg)',
                                                                 color: isActive ? c.text : 'var(--text-secondary)',
@@ -585,8 +605,12 @@ export default function ContentViewer({
                                                                 transition: 'all 0.15s'
                                                             }}
                                                         >
-                                                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: isActive ? c.text : c.bg, flexShrink: 0, border: `1px solid ${c.text}60` }} />
-                                                            {val}
+                                                            {photo ? (
+                                                                <img src={photo} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: isActive ? c.text : c.bg, flexShrink: 0, border: `1px solid ${c.text}60` }} />
+                                                            )}
+                                                            {label}
                                                             <span style={{ fontSize: 10, opacity: 0.6, fontWeight: 400 }}>({count})</span>
                                                         </button>
                                                     );
@@ -696,16 +720,31 @@ export default function ContentViewer({
                             const colorConfig = prop?.colorConfig ? JSON.parse(prop.colorConfig) : {};
                             return vals.map(val => {
                                 const c = getBadgeColorObj(val, colorConfig);
+                                let displayLabel = val;
+                                let photoUrl = null;
+
+                                if (prop?.type === 'PERSON') {
+                                    const allUsers: any[] = JSON.parse(userOptionsRaw || '[]');
+                                    const user = allUsers.find(u => u.id === val || u.name === val);
+                                    if (user) {
+                                        displayLabel = user.name;
+                                        photoUrl = user.photo;
+                                    }
+                                }
+
                                 return (
                                     <span key={`${propId}:${val}`} style={{
                                         display: 'inline-flex', alignItems: 'center', gap: 5,
-                                        padding: '3px 8px 3px 10px', borderRadius: 20,
+                                        padding: photoUrl ? '2px 8px 2px 2px' : '3px 8px 3px 10px', borderRadius: 20,
                                         background: c.bg, color: c.text,
                                         fontSize: 12, fontWeight: 600,
                                         border: `1px solid ${c.text}30`
                                     }}>
+                                        {photoUrl && (
+                                            <img src={photoUrl} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                                        )}
                                         <span style={{ opacity: 0.6, fontSize: 10 }}>{prop?.name}:</span>
-                                        {val}
+                                        {displayLabel}
                                         <button onClick={() => toggleFilter(propId, val)} style={{
                                             background: 'none', border: 'none', cursor: 'pointer',
                                             display: 'flex', padding: 0, color: c.text, opacity: 0.6

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight, Calendar, GripVertical } from 'lucide-react';
 import { getBadgeColorObj } from '../../lib/colors';
 import { updateSingleContentField } from '../../lib/content-actions';
+import { useTimelinePan } from '../../hooks/useTimelinePan';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -436,6 +437,9 @@ export default function TimelineView({
         }
     }, [exactDaysFromStart, colW]);
 
+    // ── Canvas pan-scroll ──
+    useTimelinePan(gridRef, !resizingItemId && !draggedItemId);
+
     const navigate = (dir: -1 | 1) => {
         const d = new Date(startDate);
         d.setDate(d.getDate() + dir * Math.round(totalDays / 3));
@@ -492,7 +496,7 @@ export default function TimelineView({
             </div>
 
             {/* Grid */}
-            <div style={{ display: 'flex', overflow: 'auto', position: 'relative' }} ref={gridRef}>
+            <div style={{ display: 'flex', overflow: 'auto', position: 'relative', cursor: (resizingItemId || draggedItemId) ? 'default' : 'grab' }} ref={gridRef}>
                 <div style={{ minWidth: LEFT_PANEL + totalDays * colW }}>
                     <TimelineHeader
                         topRowItems={topRowItems}
@@ -612,7 +616,7 @@ export default function TimelineView({
                                                 .timeline-row-item:hover { background: var(--sidebar-bg) !important; }
                                                 .timeline-row-item:hover .grip-handle { opacity: 0.6 !important; }
                                             `}</style>
-                                            <div style={{
+                                            <div data-nopan="true" style={{
                                                 width: LEFT_PANEL, flexShrink: 0, borderRight: '1px solid var(--border-color)',
                                                 display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', overflow: 'hidden',
                                                 position: 'sticky', left: 0, background: content.colorMatch ? `${content.colorMatch}1a` : 'var(--bg-color)',

@@ -89,7 +89,7 @@ export default async function DashboardLayout({
         ? await prisma.task.count({
             where: {
                 workspaceId: user.activeWorkspaceId,
-                assigneeId: user.id,
+                assignees: { some: { id: user.id } },
                 status: { not: 'DONE' }
             }
         })
@@ -100,7 +100,7 @@ export default async function DashboardLayout({
         ? await prisma.task.count({
             where: {
                 workspaceId: user.activeWorkspaceId,
-                assigneeId: user.id
+                assignees: { some: { id: user.id } },
             }
         })
         : 0;
